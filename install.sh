@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIR="$HOME/.config/opencode"
 
 # ---------- animation helpers ----------
-GREEN='\033[32m'; CYAN='\033[36m'; YELLOW='\033[33m'; RED='\033[31m'; BOLD='\033[1m'; DIM='\033[2m'; RESET='\033[0m'
+GREEN='\033[32m'; CYAN='\033[36m'; RED='\033[31m'; BOLD='\033[1m'; RESET='\033[0m'
 SPIN=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
 
 spin() { # spin <label> <cmd...> — runs cmd bg, spinner dekhanu thake
@@ -142,11 +142,20 @@ else
 fi
 
 head_step "Installing dependencies"
+needs_update() { # apt lists last 12h e fresh thakle skip (faster re-install)
+    local d="$PREFIX/var/lib/apt/lists"
+    [ -d "$d" ] || return 0
+    find "$d" -type f -newermt "-12 hours" 2>/dev/null | grep -q . && return 1 || return 0
+}
 if command -v pkg >/dev/null 2>&1; then
     if [ "$(id -u)" = "0" ]; then
         echo "  WARNING: pkg as root chole na (dev container?) — existing dependencies check korbo..."
     else
-        spin "Updating package index" pkg update -y || true
+        if needs_update; then
+            spin "Updating package index" pkg update -y || true
+        else
+            echo "  (package list 12h er moddhe fresh — update skip, faster)"
+        fi
         spin "Installing ripgrep git curl unzip tar" pkg install -y ripgrep git curl unzip tar libc++
     fi
 else

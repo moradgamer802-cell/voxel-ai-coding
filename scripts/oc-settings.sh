@@ -26,9 +26,12 @@ saved_small() {
     [ -f "$CONFIG" ] && sed -n 's/.*"small_model"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$CONFIG" | head -n1
 }
 
-[ -z "$saved_model" ] && MODEL="$(saved_model || true)"
-MODEL="$(saved_model || echo "$MODEL")"
-SMALL="$(saved_small || echo "$SMALL")"
+if [ -f "$CONFIG" ]; then
+    CUR_MODEL="$(saved_model)"
+    CUR_SMALL="$(saved_small)"
+fi
+[ -n "${CUR_MODEL:-}" ] && MODEL="$CUR_MODEL"
+[ -n "${CUR_SMALL:-}" ] && SMALL="$CUR_SMALL"
 
 write_config() {
     mkdir -p "$CONFIG_DIR"
@@ -85,7 +88,7 @@ pick_model() {
     echo "  4) Tiny (smallest)  : voxel/ling-3.0-tiny-free"
     echo "  5) Custom ID        (e.g. voxel/gpt-5.5)"
     echo -n "  [1-5, Enter thakbe - $prev]: "
-    read -r CHOICE
+    read -r CHOICE || CHOICE=0
     case "$CHOICE" in
         1) MODEL="voxel/deepseek-v4-flash-free"
            SMALL="voxel/ling-3.0-tiny-free";;
