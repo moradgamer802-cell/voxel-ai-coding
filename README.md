@@ -16,7 +16,7 @@ Native Android aarch64 build, **no proot, no glibc, no container**.
 ## Install (one click)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/moradgamer802-cell/voxel/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/moradgamer802-cell/voxel-ai-coding/main/install.sh | bash
 ```
 
 Na, locally:

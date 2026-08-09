@@ -4,7 +4,7 @@
 set -e
 
 REPO="guysoft/opencode-termux"
-GH_REPO="${GH_REPO:-moradgamer802-cell/voxel}"
+GH_REPO="${GH_REPO:-moradgamer802-cell/voxel-ai-coding}"
 DEFAULT_ZEN_KEY="${ZEN_API_KEY:-sk-PKOWRt2391BL0MP3W90yaG8qx4vofQJQgigJreBBYjrArj0lwuU1HkWUqOHgDGHP}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIR="$HOME/.config/opencode"
