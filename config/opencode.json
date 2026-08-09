@@ -1,8 +1,18 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "username": "deshi-dev",
-  "model": "opencode/deepseek-v4-flash-free",
-  "small_model": "opencode/ling-3.0-tiny-free",
+  "provider": {
+    "voxel": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Voxel (Zen)",
+      "options": {
+        "baseURL": "https://opencode.ai/zen/v1",
+        "apiKey": "{env:OPENCODE_API_KEY}"
+      }
+    }
+  },
+  "model": "voxel/deepseek-v4-flash-free",
+  "small_model": "voxel/ling-3.0-tiny-free",
   "default_agent": "bangla",
   "permission": {
     "bash": "ask",

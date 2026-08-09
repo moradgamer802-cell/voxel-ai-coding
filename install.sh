@@ -1,5 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# OpenCode Termux — ready-to-use AI coding CLI installer
+# VOXEL — ready-to-use AI coding CLI installer
 # Native Android aarch64 build (guysoft/opencode-termux), no proot, no glibc.
 set -e
 
@@ -9,17 +9,51 @@ DEFAULT_ZEN_KEY="${ZEN_API_KEY:-sk-PKOWRt2391BL0MP3W90yaG8qx4vofQJQgigJreBBYjrAr
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIR="$HOME/.config/opencode"
 
+# ---------- animation helpers ----------
+GREEN='\033[32m'; CYAN='\033[36m'; YELLOW='\033[33m'; RED='\033[31m'; BOLD='\033[1m'; DIM='\033[2m'; RESET='\033[0m'
+SPIN=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+
+spin() { # spin <label> <cmd...> — runs cmd bg, spinner dekhanu thake
+    local label="$1"; shift
+    "$@" >/dev/null 2>&1 &
+    local pid=$!
+    local i=0
+    while kill -0 $pid 2>/dev/null; do
+        printf "\r\033[2K${CYAN}%s${RESET} %s" "${SPIN[i++ % 10]}" "$label"
+        sleep 0.12
+    done
+    wait $pid; local rc=$?
+    if [ $rc -eq 0 ]; then
+        printf "\r\033[2K${GREEN}${BOLD}[DONE]${RESET} ${GREEN}%s${RESET}\n" "$label"
+    else
+        printf "\r\033[2K${RED}${BOLD}[FAIL]${RESET} %s (rc=$rc)\n" "$label"
+    fi
+    return $rc
+}
+
+banner() { # VOXEL logo — line by line, green glow
+    local lines=(
+        '██╗    ██╗ ██████╗  ██╗  ██╗ ███████╗ ██╗'
+        '██║    ██║ ██╔══██╗ ╚██╗██╔╝ ██╔════╝ ██║'
+        '██║    ██║ ██║  ██║  ╚███╔╝  ███████╗ ██║'
+        '╚██╗  ██╔╝ ██║  ██║  ██╔██╗  ╚════██║ ██║'
+        ' ╚██████╔╝ ╚██████╔╝ ██╔╝ ██╗ ███████╔╝ ███████╗'
+        '  ╚═══╝   ╚═════╝ ╚═╝  ╚═╝ ╚══════╝ ╚══════╝'
+    )
+    echo
+    for ln in "${lines[@]}"; do
+        printf "${GREEN}${BOLD}%s${RESET}\n" "$ln"
+        sleep 0.08
+    done
+    echo
+}
+
 echo
-echo "██╗    ██╗ ██████╗  ██╗  ██╗ ███████╗ ██╗"
-echo "██║    ██║ ██╔══██╗ ╚██╗██╔╝ ██╔════╝ ██║"
-echo "██║    ██║ ██║  ██║  ╚███╔╝  ███████╗ ██║"
-echo "╚██╗  ██╔╝ ██║  ██║  ██╔██╗  ╚════██║ ██║"
-echo " ╚██████╔╝ ╚██████╔╝ ██╔╝ ██╗ ███████╔╝ ███████╗"
-echo "  ╚═══╝   ╚═════╝ ╚═╝  ╚═╝ ╚══════╝ ╚══════╝"
-echo "====================================="
-echo "  VOXEL — OpenCode Termux Installer"
-echo "  (ready-to-use AI coding CLI)"
-echo "====================================="
+banner
+printf "${BOLD}=====================================${RESET}\n"
+printf "${BOLD}  VOXEL — OpenCode Termux Installer${RESET}\n"
+printf "${BOLD}  (ready-to-use AI coding CLI)${RESET}\n"
+printf "${BOLD}=======================================${RESET}\n"
 echo
 
 echo "[1/7] Checking Termux environment..."
@@ -39,7 +73,14 @@ echo "Termux OK: $PREFIX (arch: $ARCH)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-echo "[2/7] Downloading latest OpenCode (Android aarch64)..."
+STEP=0
+head_step() { # [NN%] label
+    STEP=$((STEP+1))
+    local pct=$((STEP*100/9))
+    printf "\n${BOLD}[${GREEN}%3d%%${RESET}${BOLD}]${RESET} %s\n" "$pct" "$1"
+}
+
+echo "[2/7] Downloading VOXEL core (Android aarch64)..."
 ZIP_URL="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep -o 'https://[^"]*android-aarch64\.zip' | head -n1)"
 if [ -z "$ZIP_URL" ]; then
     echo "ERROR: Release zip khuje pai nai. Internet connection check korun."
@@ -47,34 +88,36 @@ if [ -z "$ZIP_URL" ]; then
 fi
 SUMS_URL="${ZIP_URL%/*}/SHA256SUMS"
 echo "Downloading: $ZIP_URL"
-curl -fsSL --retry 3 -o "$TMP/opencode.zip" "$ZIP_URL"
-curl -fsSL --retry 3 -o "$TMP/SHA256SUMS" "$SUMS_URL"
+echo "  (progress bar — 0%..100%)"
+curl -fLsS --retry 3 --progress-bar -o "$TMP/opencode.zip" "$ZIP_URL"
+curl -fsSL --retry 3 --progress-bar -o "$TMP/SHA256SUMS" "$SUMS_URL"
 EXPECTED="$(grep "$(basename "$ZIP_URL")" "$TMP/SHA256SUMS" | awk '{print $1}' | head -n1)"
 ACTUAL="$(sha256sum "$TMP/opencode.zip" | awk '{print $1}')"
 if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
     echo "ERROR: SHA256 mismatch — download corrupted, aborted."
     exit 1
 fi
+spin "Verifying checksum (SHA256)" true
 echo "Download OK (SHA256 verified)"
 
 echo "[2.5/7] Checking native libraries..."
 extract_one() {
-    # $1=zip, $2=file -> cwd
+    # $1=zip, $2=file -> extracted into $TMP
     if command -v unzip >/dev/null 2>&1; then
-        unzip -o -q "$1" "$2"
+        (cd "$TMP" && unzip -o -q "$1" "$2")
     elif command -v busybox >/dev/null 2>&1; then
-        busybox unzip -o -q "$1" "$2"
+        (cd "$TMP" && busybox unzip -o -q "$1" "$2")
     else
         return 1
     fi
 }
 if [ ! -f "$PREFIX/lib/libc++_shared.so" ]; then
-    echo "libc++_shared.so missing — bootstrap (apt er jonno dorkar)..."
+    head_step "Checking native libraries — libc++ bootstrap"
     if extract_one "$TMP/opencode.zip" libc++_shared.so; then
-        install -m644 "$TMP/libc++_shared.so" "$PREFIX/lib/libc++_shared.so"
-        echo "Bootstrap OK (from opencode zip)"
+        spin "Bootstrapping libc++ from release" install -m644 "$TMP/libc++_shared.so" "$PREFIX/lib/libc++_shared.so"
+        echo "  Bootstrap OK (from opencode zip)"
     else
-        echo "unzip/busybox nai — Termux repo theke libc++ deb neya hocche..."
+        echo "  unzip/busybox nai — Termux repo theke libc++ deb neya hocche..."
         PKG_INDEX="$TMP/packages-index"
         curl -fsSL --retry 3 -o "$PKG_INDEX" \
             "https://packages-cf.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages" || true
@@ -82,110 +125,118 @@ if [ ! -f "$PREFIX/lib/libc++_shared.so" ]; then
         if [ -n "$DEB_PATH" ]; then
             curl -fsSL --retry 3 -o "$TMP/libc.deb" "https://packages-cf.termux.dev/apt/termux-main/$DEB_PATH"
             md() { mkdir -p "$TMP/root"; dpkg-deb -x "$TMP/libc.deb" "$TMP/root"; }
-            md
+            spin "Extracting libc++ package" md
             install -m644 "$TMP/root/data/data/com.termux/files/usr/lib/libc++_shared.so" "$PREFIX/lib/" 2>/dev/null \
-                && echo "Bootstrap OK (from libc++ deb)"
+                && echo "  Bootstrap OK (from libc++ deb)"
         else
-            echo "WARNING: bootstrap fail — 'pkg install -y libc++' nije chalano. Agamikal: tarpore abar bash install.sh."
+            echo "  WARNING: bootstrap fail — 'pkg install -y libc++' nije chalano. Tarpore abar bash install.sh."
         fi
     fi
 else
-    echo "libc++_shared.so already present — OK"
+    head_step "Checking native libraries — OK"
 fi
 
-echo "[3/7] Installing dependencies..."
+head_step "Installing dependencies"
 if command -v pkg >/dev/null 2>&1; then
     if [ "$(id -u)" = "0" ]; then
-        echo "WARNING: pkg as root chole na (dev container?) — existing dependencies check korbo..."
+        echo "  WARNING: pkg as root chole na (dev container?) — existing dependencies check korbo..."
     else
-        pkg update -y
-        pkg install -y ripgrep git curl unzip tar libc++
+        spin "Updating package index" pkg update -y || true
+        spin "Installing ripgrep git curl unzip tar" pkg install -y ripgrep git curl unzip tar libc++
     fi
 else
-    echo "WARNING: pkg not found — existing dependencies check korbo..."
+    echo "  WARNING: pkg not found — existing dependencies check korbo..."
 fi
 for dep in rg git curl unzip tar; do
     command -v "$dep" >/dev/null 2>&1 || { echo "ERROR: $dep missing. Termux e: pkg install -y $dep"; exit 1; }
 done
-echo "Dependencies OK"
+echo "  Dependencies OK"
 
-echo "[2.6] Resolving install source..."
+head_step "Resolving install source"
 if [ ! -d "$SCRIPT_DIR/config" ] || [ ! -d "$SCRIPT_DIR/skills" ]; then
-    echo "One-click mode: install.sh curl|bash cholche — config repo theke clone korte hobe..."
-    git clone --depth 1 "https://github.com/$GH_REPO.git" "$TMP/source" || {
+    echo "  One-click mode: config repo theke clone korte hobe..."
+    spin "Cloning voxel config repo" git clone --depth 1 "https://github.com/$GH_REPO.git" "$TMP/source" || {
         echo "ERROR: config repo clone hoyni. Locally clone kore: bash install.sh"
         exit 1
     }
     SCRIPT_DIR="$TMP/source"
 fi
-echo "Source OK: $SCRIPT_DIR"
+echo "  Source OK: $SCRIPT_DIR"
 
-echo "[4/7] Installing opencode..."
-cd "$TMP"
-unzip -o -q opencode.zip
-mkdir -p "$PREFIX/libexec/opencode" "$PREFIX/lib"
-install -m755 opencode "$PREFIX/bin/opencode"
-install -m755 opencode.bin "$PREFIX/libexec/opencode/opencode.bin"
-install -m644 libtagfix.so libopentui.so "$PREFIX/lib/"
-if [ ! -f "$PREFIX/lib/libc++_shared.so" ]; then
-    install -m644 libc++_shared.so "$PREFIX/lib/"
-fi
-if [ -f librust_pty_arm64.so ]; then
-    install -m644 librust_pty_arm64.so "$PREFIX/lib/"
-fi
-echo "opencode installed -> $PREFIX/bin/opencode"
-
-echo "[5/7] Installing config, agent, commands, theme..."
-mkdir -p "$CONFIG_DIR/agent" "$CONFIG_DIR/command" "$CONFIG_DIR/themes" "$CONFIG_DIR/skills"
-if [ -f "$CONFIG_DIR/opencode.json" ] || [ -f "$CONFIG_DIR/opencode.jsonc" ]; then
-    cp -n "$CONFIG_DIR/opencode.json" "$CONFIG_DIR/opencode.json.bak" 2>/dev/null || true
-    cp -n "$CONFIG_DIR/opencode.jsonc" "$CONFIG_DIR/opencode.jsonc.bak" 2>/dev/null || true
-    echo "Purono config backup kora hoyeche (*.bak)"
-fi
-install -m644 "$SCRIPT_DIR/config/opencode.json" "$CONFIG_DIR/opencode.json"
-install -m644 "$SCRIPT_DIR/config/agent/"*.md "$CONFIG_DIR/agent/" 2>/dev/null || true
-install -m644 "$SCRIPT_DIR/config/command/"*.md "$CONFIG_DIR/command/" 2>/dev/null || true
-install -m644 "$SCRIPT_DIR/config/themes/"*.json "$CONFIG_DIR/themes/" 2>/dev/null || true
-cp -rn "$SCRIPT_DIR/skills/"* "$CONFIG_DIR/skills/" 2>/dev/null || true
-if [ -f "$SCRIPT_DIR/scripts/oc-settings.sh" ]; then
-    install -m755 "$SCRIPT_DIR/scripts/oc-settings.sh" "$PREFIX/bin/oc-settings"
-    echo "oc-settings installed -> $PREFIX/bin/oc-settings"
-fi
-echo "Config + agent + commands + theme + skills installed"
-
-echo "[6/7] Setting up AI provider (OpenCode Zen, default key)..."
-if ! grep -q "OPENCODE_API_KEY\|OPENCODE_ZEN_API_KEY" "$HOME/.bashrc" 2>/dev/null; then
-    echo "export OPENCODE_API_KEY=\"$DEFAULT_ZEN_KEY\"" >> "$HOME/.bashrc"
-    echo "OpenCode Zen default key save hoyeche ($HOME/.bashrc)"
-    echo "NOTE: nijer key thakle: ZEN_API_KEY=<key> bash install.sh"
-else
-    echo "OPENCODE_API_KEY already set — OK"
-fi
-
-echo "[6.5/7] Checking stale opencode wrappers..."
-STALE="$HOME/.opencode/bin/opencode"
-if [ -e "$STALE" ] || [ -L "$STALE" ]; then
-    if "$STALE" --version >/dev/null 2>&1; then
-        echo "OK: purono wrapper ($STALE) kaj korche — rakha holo"
+install_core() {
+    cd "$TMP"
+    unzip -o -q opencode.zip
+    mkdir -p "$PREFIX/libexec/opencode" "$PREFIX/lib"
+    if [ -f "$SCRIPT_DIR/scripts/voxel" ]; then
+        install -m755 "$SCRIPT_DIR/scripts/voxel" "$PREFIX/bin/voxel"
     else
-        mv "$STALE" "$STALE.bak" 2>/dev/null && echo "Stale broken wrapper ($STALE) -> $STALE.bak (new ekhon use hobe)"
+        install -m755 opencode "$PREFIX/bin/voxel"
     fi
+    install -m755 opencode.bin "$PREFIX/libexec/opencode/opencode.bin"
+    install -m644 libtagfix.so libopentui.so "$PREFIX/lib/"
+    if [ ! -f "$PREFIX/lib/libc++_shared.so" ]; then
+        install -m644 libc++_shared.so "$PREFIX/lib/"
+    fi
+    if [ -f librust_pty_arm64.so ]; then
+        install -m644 librust_pty_arm64.so "$PREFIX/lib/"
+    fi
+    if [ -e "$PREFIX/bin/opencode" ]; then
+        mv "$PREFIX/bin/opencode" "$PREFIX/bin/opencode.bak" 2>/dev/null
+    fi
+}
+head_step "Installing voxel core (bin/libs)"
+spin "Installing voxel binary + libs" install_core
+echo "  voxel -> $PREFIX/bin/voxel"
+
+install_config() {
+    mkdir -p "$CONFIG_DIR/agent" "$CONFIG_DIR/command" "$CONFIG_DIR/themes" "$CONFIG_DIR/skills"
+    if [ -f "$CONFIG_DIR/opencode.json" ] || [ -f "$CONFIG_DIR/opencode.jsonc" ]; then
+        cp -n "$CONFIG_DIR/opencode.json" "$CONFIG_DIR/opencode.json.bak" 2>/dev/null || true
+        cp -n "$CONFIG_DIR/opencode.jsonc" "$CONFIG_DIR/opencode.jsonc.bak" 2>/dev/null || true
+    fi
+    install -m644 "$SCRIPT_DIR/config/opencode.json" "$CONFIG_DIR/opencode.json"
+    install -m644 "$SCRIPT_DIR/config/agent/"*.md "$CONFIG_DIR/agent/" 2>/dev/null || true
+    install -m644 "$SCRIPT_DIR/config/command/"*.md "$CONFIG_DIR/command/" 2>/dev/null || true
+    install -m644 "$SCRIPT_DIR/config/themes/"*.json "$CONFIG_DIR/themes/" 2>/dev/null || true
+    cp -rn "$SCRIPT_DIR/skills/"* "$CONFIG_DIR/skills/" 2>/dev/null || true
+    if [ -f "$SCRIPT_DIR/scripts/oc-settings.sh" ]; then
+        install -m755 "$SCRIPT_DIR/scripts/oc-settings.sh" "$PREFIX/bin/oc-settings"
+    fi
+}
+head_step "Installing config, agent, commands, theme"
+spin "Installing config + skills" install_config
+echo "  oc-settings -> $PREFIX/bin/oc-settings"
+
+head_step "Setting up AI provider (OpenCode Zen + default key)"
+if ! grep -q "OPENCODE_API_KEY\|OPENCODE_ZEN_API_KEY" "$HOME/.bashrc" 2>/dev/null; then
+    printf 'export OPENCODE_API_KEY="%s"\n' "$DEFAULT_ZEN_KEY" >> "$HOME/.bashrc"
+    echo "  Zen default key -> ~/.bashrc (zero config)"
+    echo "  NOTE: nijer key thakle: ZEN_API_KEY=<key> bash install.sh"
+else
+    echo "  OPENCODE_API_KEY already set — OK"
 fi
 
-echo "[7/7] Verifying install..."
-"$PREFIX/bin/opencode" --version || { echo "ERROR: opencode choltese na. 'bash install.sh' abar try korun."; exit 1; }
-echo "OK: opencode ready at $PREFIX/bin/opencode"
+head_step "Cleaning stale wrappers"
+if [ -e "$HOME/.opencode/bin/opencode" ] && ! "$HOME/.opencode/bin/opencode" --version >/dev/null 2>&1; then
+    mv "$HOME/.opencode/bin/opencode" "$HOME/.opencode/bin/opencode.bak" 2>/dev/null && echo "  stale wrapper -> .bak"
+fi
+
+head_step "Verifying install"
+if ! VERSION="$("$PREFIX/bin/voxel" --version 2>&1)"; then
+    echo "  ERROR: voxel choltese na. 'bash install.sh' abar chalao."
+    exit 1
+fi
+echo "  voxel v$VERSION — ready!"
 
 echo
-echo "====================================="
-echo "  Done! VOXEL ready!"
-echo "====================================="
-echo "1) Run:       opencode   (notun terminal e: source ~/.bashrc)"
-echo "2) Model:     FREE zen model: deepseek-v4-flash-free (default). /models diye change korun"
-echo "3) Theme:     opencode er vitore /theme -> 'bangladeshi' select korun"
-echo "4) Commands:  /dekho  /review  /fix  /model  /auto  /safe   (apnar custom slash commands)"
-echo "5) Agent:     'bangla' default agent — Bangla/Banglish e kotha bole"
-echo "6) API key:   OpenCode Zen default key already set — zero config"
-echo "7) Settings:  oc-settings model (default/mid/max/tiny) | oc-settings auto on|off (auto-approve)"
+printf "${GREEN}${BOLD}  [##########] 100%%  VOXEL install complete!${RESET}\n"
+echo "============================================"
+echo "1) Run     : voxel    (notun terminal e, or: hash -r)"
+echo "2) Model   : FREE zen model voxel/deepseek-v4-flash-free (Max default)"
+echo "              oc-settings model  -> max/mid/ultra/tiny popup"
+echo "3) Theme   : voxel vitore /theme -> 'bangladeshi'"
+echo "4) Commands: /approve  /safe  /model  /dekho  /review  /fix  /voxel"
+echo "5) Agent   : 'DeshiDev' — English default (Bangla likhle Bangla reply)"
+echo "6) Perms   : /approve -> auto-approve ON | /safe -> ask-mode"
 echo
-echo "NOTE: config change korle opencode restart korte hobe. Notun terminal khulo (na hash -r)."
+echo "NOTE: config change korle voxel restart koro."

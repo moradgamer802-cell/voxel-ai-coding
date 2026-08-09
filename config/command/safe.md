@@ -1,5 +1,5 @@
 ---
-description: Auto-approve OFF — bash/edit abar prompt jiggasha korbe.
+description: Disable auto-approve — ask mode e fire aao (safe).
 agent: bangla
 ---
 
