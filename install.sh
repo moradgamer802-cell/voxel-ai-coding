@@ -29,37 +29,10 @@ if [ "$ARCH" != "aarch64" ]; then
 fi
 echo "Termux OK: $PREFIX (arch: $ARCH)"
 
-echo "[2/7] Installing dependencies..."
-if command -v pkg >/dev/null 2>&1; then
-    if [ "$(id -u)" = "0" ]; then
-        echo "WARNING: pkg as root chole na (dev container?) — existing dependencies check korbo..."
-    else
-        pkg update -y
-        pkg install -y ripgrep git curl unzip tar
-    fi
-else
-    echo "WARNING: pkg not found — existing dependencies check korbo..."
-fi
-for dep in rg git curl unzip tar; do
-    command -v "$dep" >/dev/null 2>&1 || { echo "ERROR: $dep missing. Termux e: pkg install -y $dep"; exit 1; }
-done
-echo "Dependencies OK"
-
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-echo "[2.5/7] Resolving install source..."
-if [ ! -d "$SCRIPT_DIR/config" ] || [ ! -d "$SCRIPT_DIR/skills" ]; then
-    echo "One-click mode: install.sh curl|bash cholche — config repo theke clone korte hobe..."
-    git clone --depth 1 "https://github.com/$GH_REPO.git" "$TMP/source" || {
-        echo "ERROR: config repo clone hoyni. Locally clone kore: bash install.sh"
-        exit 1
-    }
-    SCRIPT_DIR="$TMP/source"
-fi
-echo "Source OK: $SCRIPT_DIR"
-
-echo "[3/7] Downloading latest OpenCode (Android aarch64)..."
+echo "[2/7] Downloading latest OpenCode (Android aarch64)..."
 ZIP_URL="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep -o 'https://[^"]*android-aarch64\.zip' | head -n1)"
 if [ -z "$ZIP_URL" ]; then
     echo "ERROR: Release zip khuje pai nai. Internet connection check korun."
@@ -77,13 +50,79 @@ if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
 fi
 echo "Download OK (SHA256 verified)"
 
+echo "[2.5/7] Checking native libraries..."
+extract_one() {
+    # $1=zip, $2=file -> cwd
+    if command -v unzip >/dev/null 2>&1; then
+        unzip -o -q "$1" "$2"
+    elif command -v busybox >/dev/null 2>&1; then
+        busybox unzip -o -q "$1" "$2"
+    else
+        return 1
+    fi
+}
+if [ ! -f "$PREFIX/lib/libc++_shared.so" ]; then
+    echo "libc++_shared.so missing — bootstrap (apt er jonno dorkar)..."
+    if extract_one "$TMP/opencode.zip" libc++_shared.so; then
+        install -m644 "$TMP/libc++_shared.so" "$PREFIX/lib/libc++_shared.so"
+        echo "Bootstrap OK (from opencode zip)"
+    else
+        echo "unzip/busybox nai — Termux repo theke libc++ deb neya hocche..."
+        PKG_INDEX="$TMP/packages-index"
+        curl -fsSL --retry 3 -o "$PKG_INDEX" \
+            "https://packages-cf.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages" || true
+        DEB_PATH="$(awk '/^Package: libc\+\+$/{found=1} found && /^Filename:/{print $2; exit}' "$PKG_INDEX" 2>/dev/null)"
+        if [ -n "$DEB_PATH" ]; then
+            curl -fsSL --retry 3 -o "$TMP/libc.deb" "https://packages-cf.termux.dev/apt/termux-main/$DEB_PATH"
+            md() { mkdir -p "$TMP/root"; dpkg-deb -x "$TMP/libc.deb" "$TMP/root"; }
+            md
+            install -m644 "$TMP/root/data/data/com.termux/files/usr/lib/libc++_shared.so" "$PREFIX/lib/" 2>/dev/null \
+                && echo "Bootstrap OK (from libc++ deb)"
+        else
+            echo "WARNING: bootstrap fail — 'pkg install -y libc++' nije chalano. Agamikal: tarpore abar bash install.sh."
+        fi
+    fi
+else
+    echo "libc++_shared.so already present — OK"
+fi
+
+echo "[3/7] Installing dependencies..."
+if command -v pkg >/dev/null 2>&1; then
+    if [ "$(id -u)" = "0" ]; then
+        echo "WARNING: pkg as root chole na (dev container?) — existing dependencies check korbo..."
+    else
+        pkg update -y
+        pkg install -y ripgrep git curl unzip tar libc++
+    fi
+else
+    echo "WARNING: pkg not found — existing dependencies check korbo..."
+fi
+for dep in rg git curl unzip tar; do
+    command -v "$dep" >/dev/null 2>&1 || { echo "ERROR: $dep missing. Termux e: pkg install -y $dep"; exit 1; }
+done
+echo "Dependencies OK"
+
+echo "[2.6] Resolving install source..."
+if [ ! -d "$SCRIPT_DIR/config" ] || [ ! -d "$SCRIPT_DIR/skills" ]; then
+    echo "One-click mode: install.sh curl|bash cholche — config repo theke clone korte hobe..."
+    git clone --depth 1 "https://github.com/$GH_REPO.git" "$TMP/source" || {
+        echo "ERROR: config repo clone hoyni. Locally clone kore: bash install.sh"
+        exit 1
+    }
+    SCRIPT_DIR="$TMP/source"
+fi
+echo "Source OK: $SCRIPT_DIR"
+
 echo "[4/7] Installing opencode..."
 cd "$TMP"
 unzip -o -q opencode.zip
 mkdir -p "$PREFIX/libexec/opencode" "$PREFIX/lib"
 install -m755 opencode "$PREFIX/bin/opencode"
 install -m755 opencode.bin "$PREFIX/libexec/opencode/opencode.bin"
-install -m644 libtagfix.so libc++_shared.so libopentui.so "$PREFIX/lib/"
+install -m644 libtagfix.so libopentui.so "$PREFIX/lib/"
+if [ ! -f "$PREFIX/lib/libc++_shared.so" ]; then
+    install -m644 libc++_shared.so "$PREFIX/lib/"
+fi
 if [ -f librust_pty_arm64.so ]; then
     install -m644 librust_pty_arm64.so "$PREFIX/lib/"
 fi
@@ -119,7 +158,7 @@ else
 fi
 
 echo "[7/7] Verifying install..."
-opencode --version || { echo "ERROR: opencode choltese na. 'pkg reinstall' try korun."; exit 1; }
+opencode --version || { echo "ERROR: opencode choltese na. 'bash install.sh' abar try korun."; exit 1; }
 
 echo
 echo "====================================="
