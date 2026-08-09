@@ -10,8 +10,14 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIR="$HOME/.config/opencode"
 
 echo
+echo "██╗    ██╗ ██████╗  ██╗  ██╗ ███████╗ ██╗"
+echo "██║    ██║ ██╔══██╗ ╚██╗██╔╝ ██╔════╝ ██║"
+echo "██║    ██║ ██║  ██║  ╚███╔╝  ███████╗ ██║"
+echo "╚██╗  ██╔╝ ██║  ██║  ██╔██╗  ╚════██║ ██║"
+echo " ╚██████╔╝ ╚██████╔╝ ██╔╝ ██╗ ███████╔╝ ███████╗"
+echo "  ╚═══╝   ╚═════╝ ╚═╝  ╚═╝ ╚══════╝ ╚══════╝"
 echo "====================================="
-echo "  OpenCode Termux Installer"
+echo "  VOXEL — OpenCode Termux Installer"
 echo "  (ready-to-use AI coding CLI)"
 echo "====================================="
 echo
@@ -172,7 +178,7 @@ echo "OK: opencode ready at $PREFIX/bin/opencode"
 
 echo
 echo "====================================="
-echo "  Done! OpenCode Termux ready!"
+echo "  Done! VOXEL ready!"
 echo "====================================="
 echo "1) Run:       opencode   (notun terminal e: source ~/.bashrc)"
 echo "2) Model:     FREE zen model: deepseek-v4-flash-free (default). /models diye change korun"

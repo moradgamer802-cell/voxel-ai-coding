@@ -1,4 +1,4 @@
-# OpenCode Termux — Ready-to-Use AI Coding CLI
+# VOXEL — OpenCode Termux (Ready-to-Use AI Coding CLI)
 
 OpenCode (AI coding agent) Termux er jonno fully customized — install korlei chole.
 Native Android aarch64 build, **no proot, no glibc, no container**.
