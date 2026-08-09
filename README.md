@@ -32,9 +32,25 @@ bash "$HOME/opencode-termux/install.sh"
    (SHA256 verified), `$PREFIX/bin/opencode`
 2. **Config** — `~/.config/opencode/opencode.json`: default agent, model, permission
 3. **Custom agent** — `bangla` (Bangla/Banglish e kotha bole)
-4. **Slash commands** — `/dekho`, `/review`, `/fix`
+4. **Slash commands** — `/dekho`, `/review`, `/fix`, `/model`, `/auto`, `/safe`
 5. **Theme** — `bangladeshi` (flag green/red), select: opencode er vitore `/theme`
 6. **Skills** — website-builder, ui-ux-responsive, react-next, project-structure, clean-code
+
+## Settings Tool (`oc-settings`)
+
+`oc-settings` installer thekei `$PREFIX/bin` e install hoy — model tier + permission switch
+
+| Command | Kaj |
+|---------|-----|
+| `oc-settings` | Menu (model select) |
+| `oc-settings model` | Model tier popup: default/mid/max/tiny/custom |
+| `oc-settings model max` | Tiers: `tiny`, `mid`/`medium`, `max`/`ultra` (direct) |
+| `oc-settings auto on` | Auto-approve ON — bash/edit prompt chhara chole |
+| `oc-settings auto off` | Ask-mode (safe), prompt abar ashbe |
+| `oc-settings models` | Zen free model list dekhao |
+
+Slash command thekeo: `/model` (tier select), `/auto` (auto-approve on), `/safe` (auto-approve off).
+**Permission change er por opencode restart koro** — config load hoy startup e.
 
 ## AI Provider (OpenCode Zen — zero config)
 

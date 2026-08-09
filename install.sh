@@ -141,6 +141,10 @@ install -m644 "$SCRIPT_DIR/config/agent/"*.md "$CONFIG_DIR/agent/" 2>/dev/null |
 install -m644 "$SCRIPT_DIR/config/command/"*.md "$CONFIG_DIR/command/" 2>/dev/null || true
 install -m644 "$SCRIPT_DIR/config/themes/"*.json "$CONFIG_DIR/themes/" 2>/dev/null || true
 cp -rn "$SCRIPT_DIR/skills/"* "$CONFIG_DIR/skills/" 2>/dev/null || true
+if [ -f "$SCRIPT_DIR/scripts/oc-settings.sh" ]; then
+    install -m755 "$SCRIPT_DIR/scripts/oc-settings.sh" "$PREFIX/bin/oc-settings"
+    echo "oc-settings installed -> $PREFIX/bin/oc-settings"
+fi
 echo "Config + agent + commands + theme + skills installed"
 
 echo "[6/7] Setting up AI provider (OpenCode Zen, default key)..."
@@ -173,8 +177,9 @@ echo "====================================="
 echo "1) Run:       opencode   (notun terminal e: source ~/.bashrc)"
 echo "2) Model:     FREE zen model: deepseek-v4-flash-free (default). /models diye change korun"
 echo "3) Theme:     opencode er vitore /theme -> 'bangladeshi' select korun"
-echo "4) Commands:  /dekho  /review  /fix   (apnar custom slash commands)"
+echo "4) Commands:  /dekho  /review  /fix  /model  /auto  /safe   (apnar custom slash commands)"
 echo "5) Agent:     'bangla' default agent — Bangla/Banglish e kotha bole"
 echo "6) API key:   OpenCode Zen default key already set — zero config"
+echo "7) Settings:  oc-settings model (default/mid/max/tiny) | oc-settings auto on|off (auto-approve)"
 echo
 echo "NOTE: config change korle opencode restart korte hobe. Notun terminal khulo (na hash -r)."
