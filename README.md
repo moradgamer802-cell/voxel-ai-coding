@@ -29,7 +29,7 @@ bash "$HOME/voxel/install.sh"
 ## What it installs
 
 1. **VOXEL binary** — `guysoft/opencode-termux` latest native Android build
-   (SHA256 verified), command: **`voxel`** (`$PREFIX/bin/voxel`)
+   (SHA256 verified), command: **`voxel-ai`** (`$PREFIX/bin/voxel-ai`)
 2. **Config** — `~/.config/opencode/opencode.json`: default agent, model, permission
 3. **Custom agent** — `bangla` (Bangla/Banglish e kotha bole)
 4. **Slash commands** — `/dekho`, `/review`, `/fix`, `/model`, `/approve`, `/safe`, `/voxel`
@@ -86,11 +86,11 @@ Default model: `voxel/deepseek-v4-flash-free` (Max default), small model: `voxel
 
 ## Troubleshooting
 
-- `voxel: command not found` → `pkg install ripgrep` + Termux restart
+- `voxel-ai: command not found` → `pkg install ripgrep` + Termux restart
 - `Bad system call` → purono glibc build thakle; `bash install.sh` abar chalale
   native build e switch hobe
 - Model error → `source ~/.bashrc` (OPENCODE_API_KEY check: `echo $OPENCODE_API_KEY`),
   key change: `ZEN_API_KEY=<new> bash install.sh` ar `oc-settings apply`
-- `voxel` e "cannot execute: required file not found" → purono broken wrapper
+- `voxel-ai` e "cannot execute: required file not found" → purono broken wrapper
   (`~/.opencode/bin/opencode`) confirm: `ls -la ~/.opencode/bin/`; installer auto-fix kore
-  (`.bak` e move), notun terminal khule `voxel` run korun
+  (`.bak` e move), notun terminal khule `voxel-ai` run korun

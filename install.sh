@@ -193,10 +193,10 @@ install_core() {
     cd "$TMP"
     unzip -o -q opencode.zip
     mkdir -p "$PREFIX/libexec/opencode" "$PREFIX/lib"
-    if [ -f "$SCRIPT_DIR/scripts/voxel" ]; then
-        install -m755 "$SCRIPT_DIR/scripts/voxel" "$PREFIX/bin/voxel"
+    if [ -f "$SCRIPT_DIR/scripts/voxel-ai" ]; then
+        install -m755 "$SCRIPT_DIR/scripts/voxel-ai" "$PREFIX/bin/voxel-ai"
     else
-        install -m755 opencode "$PREFIX/bin/voxel"
+        install -m755 opencode "$PREFIX/bin/voxel-ai"
     fi
     install -m755 opencode.bin "$PREFIX/libexec/opencode/opencode.bin"
     install -m644 libtagfix.so libopentui.so "$PREFIX/lib/"
@@ -212,7 +212,7 @@ install_core() {
 }
 head_step "Installing voxel core (bin/libs)"
 spin "Installing voxel binary + libs" install_core
-echo "  voxel -> $PREFIX/bin/voxel"
+echo "  voxel-ai -> $PREFIX/bin/voxel-ai"
 
 install_config() {
     mkdir -p "$CONFIG_DIR/agent" "$CONFIG_DIR/command" "$CONFIG_DIR/themes" "$CONFIG_DIR/skills"
@@ -248,8 +248,8 @@ if [ -e "$HOME/.opencode/bin/opencode" ] && ! "$HOME/.opencode/bin/opencode" --v
 fi
 
 head_step "Verifying install"
-if ! VERSION="$("$PREFIX/bin/voxel" --version 2>&1)"; then
-    echo "  ERROR: voxel choltese na. 'bash install.sh' abar chalao."
+if ! VERSION="$("$PREFIX/bin/voxel-ai" --version 2>&1)"; then
+    echo "  ERROR: voxel-ai choltese na. 'bash install.sh' abar chalao."
     exit 1
 fi
 echo "  voxel v$VERSION — ready!"
@@ -257,7 +257,7 @@ echo "  voxel v$VERSION — ready!"
 echo
 printf "${GREEN}${BOLD}  [##########] 100%%  VOXEL install complete!${RESET}  ${DIM}(%ss total)${RESET}\n" "$(( $(now) - INSTALL_START ))"
 echo "============================================"
-echo "1) Run     : voxel    (notun terminal e, or: hash -r)"
+echo "1) Run     : voxel-ai    (notun terminal e, or: hash -r)"
 echo "2) Model   : FREE zen model voxel/deepseek-v4-flash-free (Max default)"
 echo "              oc-settings model  -> max/mid/ultra/tiny popup"
 echo "3) Theme   : voxel vitore /theme -> 'bangladeshi'"
@@ -265,4 +265,4 @@ echo "4) Commands: /approve  /safe  /model  /dekho  /review  /fix  /voxel"
 echo "5) Agent   : 'DeshiDev' — English default (Bangla likhle Bangla reply)"
 echo "6) Perms   : /approve -> auto-approve ON | /safe -> ask-mode"
 echo
-echo "NOTE: config change korle voxel restart koro."
+echo "NOTE: config change korle voxel-ai restart koro."
