@@ -63,10 +63,13 @@ if [ -z "$PREFIX" ] || [ ! -d "$PREFIX" ]; then
     echo "  https://f-droid.org/en/packages/com.termux/"
     exit 1
 fi
-ARCH="$(uname -m)"
-if [ "$ARCH" != "aarch64" ]; then
-    echo "ERROR: Shudhu aarch64 (ARM64) supported. Apnar arch: $ARCH"
-    exit 1
+ARCH="${VOXEL_ARCH:-$(uname -m)}"
+case "$ARCH" in
+    aarch64|arm64) ZIP_MATCH="android-aarch64";;
+    *) ZIP_MATCH="android-$ARCH";;
+esac
+if [ "$ARCH" != "aarch64" ] && [ "$ARCH" != "arm64" ]; then
+    echo "INFO: apnar arch: $ARCH — try korbo release e $ZIP_MATCH asset ache na"
 fi
 echo "Termux OK: $PREFIX (arch: $ARCH)"
 
@@ -80,10 +83,12 @@ head_step() { # [NN%] label
     printf "\n${BOLD}[${GREEN}%3d%%${RESET}${BOLD}]${RESET} %s\n" "$pct" "$1"
 }
 
-echo "[2/7] Downloading VOXEL core (Android aarch64)..."
-ZIP_URL="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep -o 'https://[^"]*android-aarch64\.zip' | head -n1)"
+head_step "Downloading VOXEL core (${ZIP_MATCH})"
+ZIP_URL="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep -o "https://[^\"]*${ZIP_MATCH}\.zip" | head -n1)"
 if [ -z "$ZIP_URL" ]; then
-    echo "ERROR: Release zip khuje pai nai. Internet connection check korun."
+    echo "ERROR: $ARCH er jonno opencode build nai — shudhu aarch64/arm64 release ache."
+    echo "       (upstream Bun runtime Android build shudhu 64-bit — 32-bit phone supported nai)"
+    echo "       Env override: VOXEL_ARCH=aarch64 bash install.sh (jodi nijer zip thake)"
     exit 1
 fi
 SUMS_URL="${ZIP_URL%/*}/SHA256SUMS"
