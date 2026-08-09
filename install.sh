@@ -69,15 +69,19 @@ barspin() { # barspin <target%> <label> <cmd...> — animated progress while tas
 bar_filled() { local i=0 f=""; while [ "$i" -lt "$(( $1 / 10 ))" ]; do f="${f}██"; i=$((i+1)); done; printf '%s' "$f"; }
 bar_empty()  { local i=0 e=""; while [ "$i" -lt "$(( 10 - $1 / 10 ))" ]; do e="${e}░░"; i=$((i+1)); done; printf '%s' "$e"; }
 
-banner() { # VOXEL logo — line by line, green glow
-    local lines=(
-        '██╗    ██╗ ██████╗  ██╗  ██╗ ███████╗ ██╗'
-        '██║    ██║ ██╔══██╗ ╚██╗██╔╝ ██╔════╝ ██║'
-        '██║    ██║ ██║  ██║  ╚███╔╝  ███████╗ ██║'
-        '╚██╗  ██╔╝ ██║  ██║  ██╔██╗  ╚════██║ ██║'
-        ' ╚██████╔╝ ╚██████╔╝ ██╔╝ ██╗ ███████╔╝ ███████╗'
-        '  ╚═══╝   ╚═════╝ ╚═╝  ╚═╝ ╚══════╝ ╚══════╝'
-    )
+banner() { # VOXEL — plain ASCII (box glyphs render ulta-palta on some Termux fonts)
+    local lines
+    if command -v figlet >/dev/null 2>&1; then
+        mapfile -t lines < <(figlet -w 120 VOXEL)
+    else
+        lines=(
+            'V   V    OOOO    X   X    EEEEE   L        '
+            'V   V   O   O    X   X    E       L        '
+            'V   V   O   O     X      EEEE    L        '
+            'V   V   O   O    X   X    E       L        '
+            ' V V     OOOO    X   X    EEEEE   LLLLL   '
+        )
+    fi
     echo
     for ln in "${lines[@]}"; do
         printf "${GREEN}${BOLD}%s${RESET}\n" "$ln"
@@ -184,7 +188,7 @@ if command -v pkg >/dev/null 2>&1; then
         else
             barsettle 60 "Package index — fresh (skip update)"
         fi
-        barspin 70 "Installing dependencies" pkg install -y ripgrep git curl unzip tar libc++
+        barspin 70 "Installing dependencies" pkg install -y ripgrep git curl unzip tar libc++ figlet
     fi
 else
     echo "  WARNING: pkg nai — existing deps check..."
