@@ -10,23 +10,34 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIR="$HOME/.config/opencode"
 
 # ---------- animation helpers ----------
-GREEN='\033[32m'; CYAN='\033[36m'; RED='\033[31m'; BOLD='\033[1m'; RESET='\033[0m'
+GREEN='\033[32m'; CYAN='\033[36m'; DIM='\033[2m'; RED='\033[31m'; BOLD='\033[1m'; RESET='\033[0m'
 SPIN=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
 
-spin() { # spin <label> <cmd...> — runs cmd bg, spinner dekhanu thake
+now() { date +%s; }
+
+spin() { # spin <label> <cmd...> — spinner + elapsed time (15s+ por "loading Xs")
     local label="$1"; shift
     "$@" >/dev/null 2>&1 &
     local pid=$!
-    local i=0
+    local i=0 start=
+    start=$(now)
     while kill -0 $pid 2>/dev/null; do
-        printf "\r\033[2K${CYAN}%s${RESET} %s" "${SPIN[i++ % 10]}" "$label"
+        local el=$(( $(now) - start ))
+        if [ "$el" -ge 120 ]; then
+            printf "\r\033[2K${CYAN}%s${RESET} %s ${DIM}(loading... %ss)${RESET} ${RED}${BOLD}(stuck? Ctrl+C → bash install.sh abar — safe resume)${RESET}" "${SPIN[i++ % 10]}" "$label" "$el"
+        elif [ "$el" -ge 15 ]; then
+            printf "\r\033[2K${CYAN}%s${RESET} %s ${DIM}(loading... %ss)${RESET}" "${SPIN[i++ % 10]}" "$label" "$el"
+        else
+            printf "\r\033[2K${CYAN}%s${RESET} %s" "${SPIN[i++ % 10]}" "$label"
+        fi
         sleep 0.12
     done
     wait $pid; local rc=$?
+    local el=$(( $(now) - start ))
     if [ $rc -eq 0 ]; then
-        printf "\r\033[2K${GREEN}${BOLD}[DONE]${RESET} ${GREEN}%s${RESET}\n" "$label"
+        printf "\r\033[2K${GREEN}${BOLD}[DONE]${RESET} ${GREEN}%s${RESET} ${DIM}(%ss)${RESET}\n" "$label" "$el"
     else
-        printf "\r\033[2K${RED}${BOLD}[FAIL]${RESET} %s (rc=$rc)\n" "$label"
+        printf "\r\033[2K${RED}${BOLD}[FAIL]${RESET} %s (rc=$rc, %ss)\n" "$label" "$el"
     fi
     return $rc
 }
@@ -75,6 +86,7 @@ echo "Termux OK: $PREFIX (arch: $ARCH)"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+INSTALL_START="$(now)"
 
 STEP=0
 head_step() { # [NN%] label
@@ -84,7 +96,7 @@ head_step() { # [NN%] label
 }
 
 head_step "Downloading VOXEL core (${ZIP_MATCH})"
-ZIP_URL="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep -o "https://[^\"]*${ZIP_MATCH}\.zip" | head -n1)"
+ZIP_URL="$(curl -fsSL --connect-timeout 10 --max-time 30 "https://api.github.com/repos/$REPO/releases/latest" | grep -o "https://[^\"]*${ZIP_MATCH}\.zip" | head -n1)"
 if [ -z "$ZIP_URL" ]; then
     echo "ERROR: $ARCH er jonno opencode build nai — shudhu aarch64/arm64 release ache."
     echo "       (upstream Bun runtime Android build shudhu 64-bit — 32-bit phone supported nai)"
@@ -94,8 +106,8 @@ fi
 SUMS_URL="${ZIP_URL%/*}/SHA256SUMS"
 echo "Downloading: $ZIP_URL"
 echo "  (progress bar — 0%..100%)"
-curl -fLsS --retry 3 --progress-bar -o "$TMP/opencode.zip" "$ZIP_URL"
-curl -fsSL --retry 3 --progress-bar -o "$TMP/SHA256SUMS" "$SUMS_URL"
+curl -fLsS --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 900 --progress-bar -o "$TMP/opencode.zip" "$ZIP_URL"
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 60 --progress-bar -o "$TMP/SHA256SUMS" "$SUMS_URL"
 EXPECTED="$(grep "$(basename "$ZIP_URL")" "$TMP/SHA256SUMS" | awk '{print $1}' | head -n1)"
 ACTUAL="$(sha256sum "$TMP/opencode.zip" | awk '{print $1}')"
 if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
@@ -124,11 +136,11 @@ if [ ! -f "$PREFIX/lib/libc++_shared.so" ]; then
     else
         echo "  unzip/busybox nai — Termux repo theke libc++ deb neya hocche..."
         PKG_INDEX="$TMP/packages-index"
-        curl -fsSL --retry 3 -o "$PKG_INDEX" \
+        curl -fsSL --retry 3 --connect-timeout 10 --max-time 60 -o "$PKG_INDEX" \
             "https://packages-cf.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages" || true
         DEB_PATH="$(awk '/^Package: libc\+\+$/{found=1} found && /^Filename:/{print $2; exit}' "$PKG_INDEX" 2>/dev/null)"
         if [ -n "$DEB_PATH" ]; then
-            curl -fsSL --retry 3 -o "$TMP/libc.deb" "https://packages-cf.termux.dev/apt/termux-main/$DEB_PATH"
+            curl -fsSL --retry 3 --connect-timeout 10 --max-time 120 -o "$TMP/libc.deb" "https://packages-cf.termux.dev/apt/termux-main/$DEB_PATH"
             md() { mkdir -p "$TMP/root"; dpkg-deb -x "$TMP/libc.deb" "$TMP/root"; }
             spin "Extracting libc++ package" md
             install -m644 "$TMP/root/data/data/com.termux/files/usr/lib/libc++_shared.so" "$PREFIX/lib/" 2>/dev/null \
@@ -243,7 +255,7 @@ fi
 echo "  voxel v$VERSION — ready!"
 
 echo
-printf "${GREEN}${BOLD}  [##########] 100%%  VOXEL install complete!${RESET}\n"
+printf "${GREEN}${BOLD}  [##########] 100%%  VOXEL install complete!${RESET}  ${DIM}(%ss total)${RESET}\n" "$(( $(now) - INSTALL_START ))"
 echo "============================================"
 echo "1) Run     : voxel    (notun terminal e, or: hash -r)"
 echo "2) Model   : FREE zen model voxel/deepseek-v4-flash-free (Max default)"
