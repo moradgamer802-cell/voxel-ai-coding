@@ -9,66 +9,58 @@ DEFAULT_ZEN_KEY="${ZEN_API_KEY:-sk-PKOWRt2391BL0MP3W90yaG8qx4vofQJQgigJreBBYjrAr
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIR="$HOME/.config/opencode"
 
-# ---------- animation (progress bar) ----------
+# ---------- helpers ----------
 GREEN='\033[32m'; CYAN='\033[36m'; DIM='\033[2m'; RED='\033[31m'; BOLD='\033[1m'; RESET='\033[0m'
-BAR_CUR=0
 
 now() { date +%s; }
+say()   { printf "${GREEN}${BOLD}✓${RESET} %s\n" "$1"; }
+info()  { printf "  %s\n" "$1"; }
+fatal() { printf "${RED}${BOLD}[ERR]${RESET} %s\n" "$1"; exit 1; }
 
-bar() { # bar <pct> <label>  — [████░░░░░░░░░] 42%
-    local pct=$1 label="$2"
-    [ "$pct" -gt 100 ] && pct=100
-    [ "$pct" -lt 0 ] && pct=0
-    local filled=$((pct/10)) rest=$((10-pct/10)) i=0 f="" e=""
-    while [ $i -lt "$filled" ]; do f="${f}██"; i=$((i+1)); done
-    i=0
-    while [ $i -lt "$rest" ]; do e="${e}░░"; i=$((i+1)); done
-    printf "\r\033[2K${BOLD}[${GREEN}%s${RESET}${DIM}%s${RESET}]${RESET} ${CYAN}%3d%%${RESET}  %s   " "$f" "$e" "$pct" "$label"
+sizeMB() { # bytes -> "2.4 MB"
+    awk -v b="$1" 'BEGIN{ printf "%.1f MB", b/1048576 }'
+}
+speed() { # bytes/sec -> "1.2 MB/s"
+    awk -v b="$1" 'BEGIN{
+        if (b >= 1048576) printf "%.1f MB/s", b/1048576
+        else if (b >= 1024)  printf "%.1f KB/s", b/1024
+        else                 printf "%d B/s", b
+    }'
 }
 
-barsettle() { # barsettle <pct> <label> — instant tick + DONE line
-    local pct=$1 label="$2"
-    bar "$pct" "$label"
-    BAR_CUR=$pct
-    printf "\r\033[2K${BOLD}[${GREEN}%s${RESET}${DIM}%s${RESET}]${RESET} ${CYAN}%3d%%${RESET}  ${GREEN}${BOLD}[DONE]${RESET} ${GREEN}%s${RESET}\n" \
-        "$(bar_filled "$pct")" "$(bar_empty "$pct")" "$pct" "$label"
-}
-
-barspin() { # barspin <target%> <label> <cmd...> — animated progress while task runs
-    local target=$1 label="$2"; shift 2
-    "$@" >/dev/null 2>&1 &
-    local pid=$! start=
-    start=$(now)
-    local cur=$BAR_CUR
-    while kill -0 "$pid" 2>/dev/null; do
-        [ "$cur" -lt "$target" ] || cur="$target"
-        if [ "$cur" -lt "$target" ]; then
-            # smooth: delta halves each tick — never stalls short of target
-            cur=$(( target - (target - cur) * 3 / 4 ))
-            [ "$cur" -ge "$target" ] && cur="$target"
+# live download progress:  VOXEL AI downloading ▼ 2.4 MB / 9.5 MB [████░░░░░░] 24%  1.2 MB/s
+dlprogress() { # <url> <out>
+    local url="$1" out="$2"
+    local total=0 curl_pid got last=0 t0 t1 speedb=0 pct filled empty i f e
+    total="$(curl -sIL --connect-timeout 10 --max-time 20 "$url" \
+        | awk 'tolower($1)=="content-length:"{n=$2} END{print n+0}')"
+    curl -fLsS --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 900 -o "$out" "$url" &
+    curl_pid=$!
+    t0="$(now)" got=0
+    while kill -0 "$curl_pid" 2>/dev/null; do
+        got="$(wc -c < "$out" 2>/dev/null || echo 0)"
+        t1="$(now)"
+        speedb=0
+        [ "$t1" -gt "$t0" ] && speedb=$(( (got - last) / (t1 - t0) ))
+        last="$got"; t0="$t1"
+        if [ "$total" -gt 0 ]; then
+            pct=$(( got * 100 / total )); [ "$pct" -gt 100 ] && pct=100
+            filled=$((pct/10)); empty=$((10-filled))
+            f=""; i=0; while [ $i -lt $filled ]; do f="${f}█"; i=$((i+1)); done
+            e=""; i=0; while [ $i -lt $empty ]; do e="${e}░"; i=$((i+1)); done
+            printf "\r${BOLD}VOXEL AI ${CYAN}▼${RESET} downloading  %s / %s  [%s%s] %3d%%  %s   " \
+                "$(sizeMB "$got")" "$(sizeMB "$total")" "$f" "$e" "$pct" "$(speed "$speedb")"
+        else
+            printf "\r${BOLD}VOXEL AI ${CYAN}▼${RESET} downloading  %s   " "$(sizeMB "$got")"
         fi
-        bar "$cur" "$label"
-        sleep 0.1
+        sleep 0.25
     done
-    wait "$pid"; local rc=$?
-    local el=$(( $(now) - start ))
-    # settle animation to target
-    while [ "$cur" -lt "$target" ]; do
-        cur=$((cur+1)); bar "$cur" "$label"; sleep 0.02
-    done
-    BAR_CUR=$target
-    if [ "$rc" -eq 0 ]; then
-        printf "\r\033[2K${BOLD}[${GREEN}%s${RESET}${DIM}%s${RESET}]${RESET} ${CYAN}%3d%%${RESET}  ${BOLD}${GREEN}[DONE]${RESET} ${GREEN}%s${RESET}  ${DIM}(%ss)${RESET}\n" \
-            "$(bar_filled "$target")" "$(bar_empty "$target")" "$target" "$label" "$el"
-    else
-        printf "\r\033[2K${RED}[FAIL${RESET} ] %s (rc=%s, %ss)\n" "$label" "$rc" "$el"
-    fi
-    return $rc
+    wait "$curl_pid" || return 1
+    echo
+    say "downloaded ($(sizeMB "$(wc -c < "$out")"))"
 }
 
-bar_filled() { local i=0 f=""; while [ "$i" -lt "$(( $1 / 10 ))" ]; do f="${f}██"; i=$((i+1)); done; printf '%s' "$f"; }
-bar_empty()  { local i=0 e=""; while [ "$i" -lt "$(( 10 - $1 / 10 ))" ]; do e="${e}░░"; i=$((i+1)); done; printf '%s' "$e"; }
-
+# ---------- banner ----------
 banner() { # VOXEL — embedded figlet "big" art (font-independent, always renders)
     local lines=(
         '__      ________   ________ _'
@@ -95,9 +87,8 @@ printf "${BOLD}=======================================${RESET}\n"
 echo
 
 # ---------- [1] environment ----------
-bar 0 "Installing VOXEL AI..."
 if [ -z "$PREFIX" ] || [ ! -d "$PREFIX" ]; then
-    printf "\r\033[2K${RED}[ERR]${RESET} Installer must run inside Termux (F-Droid version).\n"
+    fatal "Installer must run inside Termux (F-Droid version)."
     echo "Play Store er Termux kaj korbe na — F-Droid theke install korun:"
     echo "  https://f-droid.org/en/packages/com.termux/"
     exit 1
@@ -108,36 +99,42 @@ case "$ARCH" in
     *) ZIP_MATCH="android-$ARCH";;
 esac
 if [ "$ARCH" != "aarch64" ] && [ "$ARCH" != "arm64" ]; then
-    echo "  INFO: apnar arch: $ARCH — $ZIP_MATCH asset try korbo"
+    info "apnar arch: $ARCH — $ZIP_MATCH asset try korbo"
 fi
-echo "  Termux OK: $PREFIX (arch: $ARCH)"
+info "Termux OK: $PREFIX (arch: $ARCH)"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 INSTALL_START="$(now)"
 
-# ---------- [2] download core ----------
-bar "$BAR_CUR" "Downloading core..."
+# ---------- [2] download core (live progress) ----------
 ZIP_URL="$(curl -fsSL --connect-timeout 10 --max-time 30 "https://api.github.com/repos/$REPO/releases/latest" | grep -o "https://[^\"]*${ZIP_MATCH}\.zip" | head -n1)"
 if [ -z "$ZIP_URL" ]; then
-    printf "\r\033[2K${RED}[ERR]${RESET} $ARCH er jonno build nai — shudhu aarch64/arm64 release ache (upstream Bun 32-bit nai).\n"
+    fatal "$ARCH er jonno build nai — shudhu aarch64/arm64 release ache (upstream Bun 32-bit nai)."
     echo "       Env override: VOXEL_ARCH=aarch64 bash install.sh"
     exit 1
 fi
 SUMS_URL="${ZIP_URL%/*}/SHA256SUMS"
-echo "  from: $ZIP_URL"
-barspin 40 "Downloading core..." curl -fLsS --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 900 -o "$TMP/opencode.zip" "$ZIP_URL"
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 60 -o "$TMP/SHA256SUMS" "$SUMS_URL" 2>/dev/null
-EXPECTED="$(grep "$(basename "$ZIP_URL")" "$TMP/SHA256SUMS" | awk '{print $1}' | head -n1)"
-ACTUAL="$(sha256sum "$TMP/opencode.zip" | awk '{print $1}')"
-if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
-    echo; echo "ERROR: SHA256 mismatch — download corrupted, aborted."
-    exit 1
-fi
-barsettle 45 "Verifying integrity (SHA256)"
 
-# ---------- [2.5] native libs (45→55) ----------
-extract_one() { # $1=zip $2=file → $TMP
+dlprogress "$ZIP_URL" "$TMP/opencode.zip" || {
+    echo
+    fatal "download fail — internet/connection check korun (retry hoyeche)."
+    exit 1
+}
+
+# checksum — backend (quiet)
+if curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 60 -o "$TMP/SHA256SUMS" "$SUMS_URL" 2>/dev/null; then
+    EXPECTED="$(grep "$(basename "$ZIP_URL")" "$TMP/SHA256SUMS" | awk '{print $1}' | head -n1)"
+    ACTUAL="$(sha256sum "$TMP/opencode.zip" | awk '{print $1}')"
+    if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
+        fatal "SHA256 mismatch — download corrupted, aborted."
+        exit 1
+    fi
+fi
+say "integrity verified (SHA256)"
+
+# ---------- [3] native libs (backend, quiet) ----------
+extract_one() { # $1=zip $2=file -> $TMP
     if command -v unzip >/dev/null 2>&1; then
         (cd "$TMP" && unzip -o -q "$1" "$2")
     elif command -v busybox >/dev/null 2>&1; then
@@ -147,68 +144,79 @@ extract_one() { # $1=zip $2=file → $TMP
     fi
 }
 if [ ! -f "$PREFIX/lib/libc++_shared.so" ]; then
+    info "libc++ binary lib nai — extracting from package..."
     if extract_one "$TMP/opencode.zip" libc++_shared.so; then
-        barspin 55 "Bootstrapping native libs" install -m644 "$TMP/libc++_shared.so" "$PREFIX/lib/libc++_shared.so"
+        install -m644 "$TMP/libc++_shared.so" "$PREFIX/lib/libc++_shared.so"
+        say "native libs installed"
     else
-        echo "  unzip/busybox nai — Termux repo theke libc++ deb..."
+        info "unzip nai — Termux repo theke libc++ deb namabo..."
         PKG_INDEX="$TMP/packages-index"
         curl -fsSL --retry 3 --connect-timeout 10 --max-time 60 -o "$PKG_INDEX" \
             "https://packages-cf.termux.dev/apt/termux-main/dist;avage/stable/main/binary-aarch64/Packages" || true
         DEB_PATH="$(awk '/^Package: libc\+\+$/{found=1} found && /^Filename:/{print $2; exit}' "$PKG_INDEX" /dev/null 2>/dev/null)"
         if [ -n "$DEB_PATH" ]; then
-            curl -fsSL --retry 3 --connect-timeout 10 --max-time 120 -o "$TMP/libc.deb" "https://packages-cf.termux.dev/apt/termux-main/$DEB_PATH"
+            curl -fsSL --retry 3 --connect-timeout 10 --max-time 120 -o "$TMP/libc.deb" \
+                "https://packages-cf.termux.dev/apt/termux-main/$DEB_PATH"
             md() { mkdir -p "$TMP/root"; dpkg-deb -x "$TMP/libc.deb" "$TMP/root"; }
-            barspin 55 "Extracting libc++ package" md
+            md
             install -m644 "$TMP/root/data/data/com.termux/files/usr/lib/libc++_shared.so" "$PREFIX/lib/" 2>/dev/null \
-                && echo "  libc++ installed (deb)"
+                && say "libc++ installed (deb)"
         else
-            echo "  WARNING: bootstrap fail — 'pkg install -y libc++' nija chalano."
+            info "WARNING: bootstrap fail — 'pkg install -y libc++' nija chalano."
         fi
     fi
 else
-    barsettle 55 "Native libs — already present"
+    info "native libs — already present"
 fi
 
-# ---------- [3] dependencies (55→70) ----------
-needs_update() { # apt lists last 12h fresh → skip (faster reinstall)
+# ---------- [4] dependencies (backend, quiet) ----------
+needs_update() { # apt lists last 12h fresh -> skip (faster reinstall)
     local d="$PREFIX/var/lib/apt/lists"
     [ -d "$d" ] || return 0
     find "$d" -type f -newermt "-12 hours" 2>/dev/null | grep -q . && return 1 || return 0
 }
 if command -v pkg >/dev/null 2>&1; then
     if [ "$(id -u)" = "0" ]; then
-        echo "  WARNING: pkg as root chole na — existing deps check korbo..."
+        info "WARNING: pkg as root chole na — existing deps check korbo..."
     else
         if needs_update; then
-            barspin 60 "Updating package index" pkg update -y || true
+            info "updating package index (backend)..."
+            pkg update -y >/dev/null 2>&1 || true
         else
-            barsettle 60 "Package index — fresh (skip update)"
+            info "package index — fresh (skip update)"
         fi
-        barspin 70 "Installing dependencies" pkg install -y ripgrep git curl unzip tar libc++ figlet
+        info "installing dependencies (ripgrep git curl unzip tar libc++ figlet)..."
+        if ! pkg install -y ripgrep git curl unzip tar libc++ figlet >"$TMP/pkg.log" 2>&1; then
+            echo
+            tail -n 5 "$TMP/pkg.log"
+            fatal "pkg install fail — internet check korun, then 'bash install.sh' abar chalao."
+            exit 1
+        fi
     fi
 else
-    echo "  WARNING: pkg nai — existing deps check..."
+    info "WARNING: pkg nai — existing deps check..."
 fi
 for dep in rg git curl unzip tar; do
-    command -v "$dep" >/dev/null 2>&1 || { echo; echo "ERROR: $dep missing — pkg install -y $dep"; exit 1; }
+    command -v "$dep" >/dev/null 2>&1 || fatal "$dep missing — pkg install -y $dep"
 done
-barsettle 70 "Dependencies OK"
+say "dependencies OK"
 
-# ---------- [source] (70→75) ----------
+# ---------- [5] source (backend, quiet) ----------
 if [ ! -d "$SCRIPT_DIR/config" ] || [ ! -d "$SCRIPT_DIR/skills" ]; then
-    barspin 75 "Resolving VOXEL source" git clone --depth 1 "https://github.com/$GH_REPO.git" "$TMP/source" || {
-        echo; echo "ERROR: config repo clone hoyni. Locally: bash install.sh"; exit 1
+    info "resolving VOXEL source..."
+    git clone --depth 1 -q "https://github.com/$GH_REPO.git" "$TMP/source" || {
+        fatal "config repo clone hoyni. Locally: bash install.sh"
+        exit 1
     }
     SCRIPT_DIR="$TMP/source"
-else
-    barsettle 75 "Source OK (local)"
 fi
+say "source resolved"
 
-# ---------- [4] core install (75→88) ----------
+# ---------- [6] core install (backend, quiet) ----------
 install_core() {
     cd "$TMP"
     unzip -o -q opencode.zip
-    mkdir -p "$PREFIX/libexec/opencode" "$PREFIX/lib"
+    mkdir -p "$PREFIX/bin" "$PREFIX/libexec/opencode" "$PREFIX/lib"
     if [ -f "$SCRIPT_DIR/scripts/voxel" ]; then
         install -m755 "$SCRIPT_DIR/scripts/voxel" "$PREFIX/bin/voxel"
     else
@@ -220,10 +228,11 @@ install_core() {
     if [ -f librust_pty_arm64.so ]; then install -m644 librust_pty_arm64.so "$PREFIX/lib/"; fi
     if [ -e "$PREFIX/bin/opencode" ]; then mv "$PREFIX/bin/opencode" "$PREFIX/bin/opencode.bak" 2>/dev/null; fi
 }
-barspin 88 "Installing voxel core" install_core
-echo "  voxel -> $PREFIX/bin/voxel"
+info "installing voxel core..."
+install_core
+say "core installed → $PREFIX/bin/voxel"
 
-# ---------- [5] config (88→94) ----------
+# ---------- [7] config + skills (backend, quiet) ----------
 install_config() {
     mkdir -p "$CONFIG_DIR/agent" "$CONFIG_DIR/command" "$CONFIG_DIR/themes" "$CONFIG_DIR/skills"
     if [ -f "$CONFIG_DIR/opencode.json" ] || [ -f "$CONFIG_DIR/opencode.jsonc" ]; then
@@ -239,37 +248,42 @@ install_config() {
         install -m755 "$SCRIPT_DIR/scripts/oc-settings.sh" "$PREFIX/bin/oc-settings"
     fi
 }
-barspin 94 "Installing config + skills" install_config
-echo "  oc-settings -> $PREFIX/bin/oc-settings"
+info "installing config + skills..."
+install_config
+say "config + skills installed (open $CONFIG_DIR)"
 
-# ---------- [6] provider (94→96) ----------
+# ---------- [8] provider (quiet) ----------
 if ! grep -q "OPENCODE_API_KEY\|OPENCODE_ZEN_API_KEY" "$HOME/.bashrc" 2>/dev/null; then
     printf 'export OPENCODE_API_KEY="%s"\n' "$DEFAULT_ZEN_KEY" >> "$HOME/.bashrc"
-    barsettle 96 "Setting up AI provider (Zen zero-config)"
+    say "AI provider configured (Zen zero-config)"
 else
-    barsettle 96 "AI provider — already configured"
+    info "AI provider — already configured"
 fi
 
-# ---------- [7] cleanup + verify (96→100) ----------
+# ---------- [9] cleanup + verify ----------
 STALE_CANDIDATES="$HOME/.opencode/bin/opencode $HOME/.opencode/bin/opencode.bak $PREFIX/bin/opencode.bak"
 for f in $STALE_CANDIDATES; do
     if [ ! -L "$f" ] && [ ! -f "$f" ]; then continue; fi
     if ! "$f" --version >/dev/null 2>&1; then
-        mv "$f" "$f.bak.old" 2>/dev/null && echo "  stale wrapper -> .bak.old"
+        mv "$f" "$f.bak.old" 2>/dev/null && info "stale wrapper -> .bak.old"
     fi
 done
 OTHER_VOXEL="$(command -v voxel 2>/dev/null || true)"
 if [ -n "$OTHER_VOXEL" ] && [ "$OTHER_VOXEL" != "$PREFIX/bin/voxel" ]; then
-    echo "  NOTICE: 'voxel' onno path thekeo: $OTHER_VOXEL — check PATH"
+    info "NOTICE: 'voxel' onno path thekeo: $OTHER_VOXEL — check PATH"
 fi
-barsettle 97 "Cleaning up"
 
+info "verifying..."
 if ! VERSION="$("$PREFIX/bin/voxel" --version 2>&1)"; then
-    echo "  ERROR: voxel choltese na. 'bash install.sh' abar chalao."
+    fatal "voxel choltese na. 'bash install.sh' abar chalao."
     exit 1
 fi
 
-# ---------- FINAL: 100% ----------
-bar 100 "VOXEL AI Ready!"
-sleep 0.4
-printf "\r\033[2K${GREEN}${BOLD}[████████████████████] 100%% VOXEL AI Ready! ${RESET}✓  ${DIM}(%ss total)${RESET}\n" "$(( $(now) - INSTALL_START ))"
+# ---------- FINAL ----------
+echo
+printf "${GREEN}${BOLD}[██████████] 100%%  VOXEL AI Ready! ${RESET}✓  ${DIM}(%ss total)${RESET}\n" "$(( $(now) - INSTALL_START ))"
+echo
+printf "${BOLD}Chalano:${RESET}  voxel            # AI — /storage/emulated/0 theke kaj\n"
+printf "${BOLD}Settings:${RESET}  oc-settings\n"
+printf "${BOLD}Version:${RESET}   %s\n" "$VERSION"
+echo
