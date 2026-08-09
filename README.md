@@ -66,3 +66,6 @@ Default model: `opencode/deepseek-v4-flash-free` (free), small model: `opencode/
   native build e switch hobe
 - Model error → `source ~/.bashrc` (OPENCODE_API_KEY check: `echo $OPENCODE_API_KEY`),
   key change: `ZEN_API_KEY=<new> bash install.sh`
+- `opencode` e "cannot execute: required file not found" → purono broken wrapper
+  (`~/.opencode/bin/opencode`) confirm: `ls -la ~/.opencode/bin/`; installer auto-fix kore
+  (`.bak` e move), notun terminal khule `opencode` run korun

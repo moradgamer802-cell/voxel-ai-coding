@@ -152,8 +152,19 @@ else
     echo "OPENCODE_API_KEY already set — OK"
 fi
 
+echo "[6.5/7] Checking stale opencode wrappers..."
+STALE="$HOME/.opencode/bin/opencode"
+if [ -e "$STALE" ] || [ -L "$STALE" ]; then
+    if "$STALE" --version >/dev/null 2>&1; then
+        echo "OK: purono wrapper ($STALE) kaj korche — rakha holo"
+    else
+        mv "$STALE" "$STALE.bak" 2>/dev/null && echo "Stale broken wrapper ($STALE) -> $STALE.bak (new ekhon use hobe)"
+    fi
+fi
+
 echo "[7/7] Verifying install..."
-opencode --version || { echo "ERROR: opencode choltese na. 'bash install.sh' abar try korun."; exit 1; }
+"$PREFIX/bin/opencode" --version || { echo "ERROR: opencode choltese na. 'bash install.sh' abar try korun."; exit 1; }
+echo "OK: opencode ready at $PREFIX/bin/opencode"
 
 echo
 echo "====================================="
@@ -166,4 +177,4 @@ echo "4) Commands:  /dekho  /review  /fix   (apnar custom slash commands)"
 echo "5) Agent:     'bangla' default agent — Bangla/Banglish e kotha bole"
 echo "6) API key:   OpenCode Zen default key already set — zero config"
 echo
-echo "NOTE: config change korle opencode restart korte hobe."
+echo "NOTE: config change korle opencode restart korte hobe. Notun terminal khulo (na hash -r)."
