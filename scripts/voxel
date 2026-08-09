@@ -21,6 +21,14 @@ export TMP="$TMPDIR"
 export OPENCODE_DISABLE_TUI_AUDIO="${OPENCODE_DISABLE_TUI_AUDIO:-1}"
 mkdir -p "$TMPDIR" 2>/dev/null || true
 
+# Default workspace: when launched without a directory argument from the
+# plain Termux home, boot inside Android shared storage (/storage/emulated/0)
+# so the AI searches the user's real files — documents, downloads, etc.
+if [ "$#" -eq 0 ] && [ "$PWD" = "$HOME" ] && [ -d /storage/emulated/0 ]; then
+    cd /storage/emulated/0
+    export OPENCODE_DEFAULT_DIR=/storage/emulated/0
+fi
+
 # Set the terminal title so the Termux toolbar shows VOXEL
 if ( : >/dev/tty ) 2>/dev/null; then printf '\033]0;VOXEL\007' >/dev/tty 2>/dev/null; fi
 
