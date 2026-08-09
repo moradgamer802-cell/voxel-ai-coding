@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "username": "deshi-dev",
+  "model": "openrouter/deepseek/deepseek-chat:free",
+  "small_model": "openrouter/deepseek/deepseek-chat:free",
+  "default_agent": "bangla",
+  "permission": {
+    "bash": "ask",
+    "edit": "ask"
+  }
+}
