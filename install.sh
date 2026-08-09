@@ -243,8 +243,23 @@ else
 fi
 
 head_step "Cleaning stale wrappers"
-if [ -e "$HOME/.opencode/bin/opencode" ] && ! "$HOME/.opencode/bin/opencode" --version >/dev/null 2>&1; then
-    mv "$HOME/.opencode/bin/opencode" "$HOME/.opencode/bin/opencode.bak" 2>/dev/null && echo "  stale wrapper -> .bak"
+STALE_CANDIDATES="$HOME/.opencode/bin/opencode $HOME/.opencode/bin/opencode.bak $PREFIX/bin/opencode.bak"
+for f in $STALE_CANDIDATES; do
+    if [ -L "$f" ] || [ -f "$f" ]; then
+        if ! "$f" --version >/dev/null 2>&1; then
+            mv "$f" "$f.bak.old" 2>/dev/null && echo "  broken stale wrapper ($f) -> .bak.old"
+        fi
+    fi
+done
+STALE="$HOME/.opencode/bin/opencode"
+if [ -e "$STALE" ] && ! "$STALE" --version >/dev/null 2>&1; then
+    mv "$STALE" "$STALE.bak" 2>/dev/null && echo "  stale wrapper -> .bak"
+fi
+# kono onno ~/bin or ~/.local/bin e purono voxel ache kino (confusing PATH)
+OTHER_VOXEL="$(command -v voxel 2>/dev/null || true)"
+if [ -n "$OTHER_VOXEL" ] && [ "$OTHER_VOXEL" != "$PREFIX/bin/voxel" ]; then
+    echo "  NOTICE: 'voxel' onno path thekeo milche: $OTHER_VOXEL"
+    echo "          PATH order thik kin- check: 'which voxel' → tarpor '$PREFIX/bin/voxel --version'"
 fi
 
 head_step "Verifying install"
@@ -252,7 +267,7 @@ if ! VERSION="$("$PREFIX/bin/voxel" --version 2>&1)"; then
     echo "  ERROR: voxel choltese na. 'bash install.sh' abar chalao."
     exit 1
 fi
-echo "  voxel v$VERSION — ready!"
+echo "  voxel v$VERSION — ready!  (command: $(command -v voxel))"
 
 echo
 printf "${GREEN}${BOLD}  [##########] 100%%  VOXEL install complete!${RESET}  ${DIM}(%ss total)${RESET}\n" "$(( $(now) - INSTALL_START ))"
