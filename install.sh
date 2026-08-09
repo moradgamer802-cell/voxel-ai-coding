@@ -69,23 +69,19 @@ barspin() { # barspin <target%> <label> <cmd...> — animated progress while tas
 bar_filled() { local i=0 f=""; while [ "$i" -lt "$(( $1 / 10 ))" ]; do f="${f}██"; i=$((i+1)); done; printf '%s' "$f"; }
 bar_empty()  { local i=0 e=""; while [ "$i" -lt "$(( 10 - $1 / 10 ))" ]; do e="${e}░░"; i=$((i+1)); done; printf '%s' "$e"; }
 
-banner() { # VOXEL — plain ASCII (box glyphs render ulta-palta on some Termux fonts)
-    local lines
-    if command -v figlet >/dev/null 2>&1; then
-        mapfile -t lines < <(figlet -w 120 VOXEL)
-    else
-        lines=(
-            'V   V    OOOO    X   X    EEEEE   L        '
-            'V   V   O   O    X   X    E       L        '
-            'V   V   O   O     X      EEEE    L        '
-            'V   V   O   O    X   X    E       L        '
-            ' V V     OOOO    X   X    EEEEE   LLLLL   '
-        )
-    fi
+banner() { # VOXEL — embedded figlet "big" art (font-independent, always renders)
+    local lines=(
+        '__      ________   ________ _'
+        '\ \    / / __ \ \ / /  ____| |     '
+        ' \ \  / / |  | \ V /| |__  | |     '
+        '  \ \/ /| |  | |> < |  __| | |     '
+        '   \  / | |__| / . \| |____| |____ '
+        '    \/   \____/_/ \_\______|______|'
+    )
     echo
     for ln in "${lines[@]}"; do
         printf "${GREEN}${BOLD}%s${RESET}\n" "$ln"
-        sleep 0.05
+        sleep 0.07
     done
     echo
 }
