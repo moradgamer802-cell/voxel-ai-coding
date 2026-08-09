@@ -11,7 +11,7 @@ CONFIG_DIR="$HOME/.config/opencode"
 
 # ---------- animation helpers ----------
 GREEN='\033[32m'; CYAN='\033[36m'; DIM='\033[2m'; RED='\033[31m'; BOLD='\033[1m'; RESET='\033[0m'
-SPIN=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+SPIN=('|' '/' '-' '\')
 
 now() { date +%s; }
 
@@ -24,11 +24,11 @@ spin() { # spin <label> <cmd...> — spinner + elapsed time (15s+ por "loading X
     while kill -0 $pid 2>/dev/null; do
         local el=$(( $(now) - start ))
         if [ "$el" -ge 120 ]; then
-            printf "\r\033[2K${CYAN}%s${RESET} %s ${DIM}(loading... %ss)${RESET} ${RED}${BOLD}(stuck? Ctrl+C → bash install.sh abar — safe resume)${RESET}" "${SPIN[i++ % 10]}" "$label" "$el"
+            printf "\r\033[2K${CYAN}%s${RESET} %s ${DIM}(loading... %ss)${RESET} ${RED}${BOLD}(stuck? Ctrl+C → bash install.sh abar — safe resume)${RESET}" "${SPIN[i++ % 4]}" "$label" "$el"
         elif [ "$el" -ge 15 ]; then
-            printf "\r\033[2K${CYAN}%s${RESET} %s ${DIM}(loading... %ss)${RESET}" "${SPIN[i++ % 10]}" "$label" "$el"
+            printf "\r\033[2K${CYAN}%s${RESET} %s ${DIM}(loading... %ss)${RESET}" "${SPIN[i++ % 4]}" "$label" "$el"
         else
-            printf "\r\033[2K${CYAN}%s${RESET} %s" "${SPIN[i++ % 10]}" "$label"
+            printf "\r\033[2K${CYAN}%s${RESET} %s" "${SPIN[i++ % 4]}" "$label"
         fi
         sleep 0.12
     done
