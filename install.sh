@@ -5,6 +5,7 @@ set -e
 
 REPO="guysoft/opencode-termux"
 GH_REPO="${GH_REPO:-moradgamer802-cell/opencode-termux}"
+DEFAULT_ZEN_KEY="${ZEN_API_KEY:-sk-PKOWRt2391BL0MP3W90yaG8qx4vofQJQgigJreBBYjrArj0lwuU1HkWUqOHgDGHP}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIR="$HOME/.config/opencode"
 
@@ -142,19 +143,13 @@ install -m644 "$SCRIPT_DIR/config/themes/"*.json "$CONFIG_DIR/themes/" 2>/dev/nu
 cp -rn "$SCRIPT_DIR/skills/"* "$CONFIG_DIR/skills/" 2>/dev/null || true
 echo "Config + agent + commands + theme + skills installed"
 
-echo "[6/7] Setting up free AI provider (OpenRouter)..."
-if ! grep -q "OPENROUTER_API_KEY" "$HOME/.bashrc" 2>/dev/null; then
-    echo "OpenRouter free API key: openrouter.ai e (free) account kore Models -> API Keys theke key nin."
-    echo -n "Free API key paste korun (skip korte Enter): "
-    read -r KEY
-    if [ -n "$KEY" ]; then
-        echo "export OPENROUTER_API_KEY=\"$KEY\"" >> "$HOME/.bashrc"
-        echo "API key save hoyeche ($HOME/.bashrc)"
-    else
-        echo "Key skip. Pore ekhane pathan: export OPENROUTER_API_KEY=...  (then: source ~/.bashrc)"
-    fi
+echo "[6/7] Setting up AI provider (OpenCode Zen, default key)..."
+if ! grep -q "OPENCODE_API_KEY\|OPENCODE_ZEN_API_KEY" "$HOME/.bashrc" 2>/dev/null; then
+    echo "export OPENCODE_API_KEY=\"$DEFAULT_ZEN_KEY\"" >> "$HOME/.bashrc"
+    echo "OpenCode Zen default key save hoyeche ($HOME/.bashrc)"
+    echo "NOTE: nijer key thakle: ZEN_API_KEY=<key> bash install.sh"
 else
-    echo "OPENROUTER_API_KEY already set — OK"
+    echo "OPENCODE_API_KEY already set — OK"
 fi
 
 echo "[7/7] Verifying install..."
@@ -165,10 +160,10 @@ echo "====================================="
 echo "  Done! OpenCode Termux ready!"
 echo "====================================="
 echo "1) Run:       opencode   (notun terminal e: source ~/.bashrc)"
-echo "2) Model:     free deepseek-chat (OpenRouter). /models diye free model select korun"
+echo "2) Model:     FREE zen model: deepseek-v4-flash-free (default). /models diye change korun"
 echo "3) Theme:     opencode er vitore /theme -> 'bangladeshi' select korun"
 echo "4) Commands:  /dekho  /review  /fix   (apnar custom slash commands)"
 echo "5) Agent:     'bangla' default agent — Bangla/Banglish e kotha bole"
-echo "6) Help:      opencode er vitore /help"
+echo "6) API key:   OpenCode Zen default key already set — zero config"
 echo
 echo "NOTE: config change korle opencode restart korte hobe."
