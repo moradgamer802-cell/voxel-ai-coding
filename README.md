@@ -1,96 +1,53 @@
 # VOXEL — OpenCode Termux (Ready-to-Use AI Coding CLI)
 
-OpenCode (AI coding agent) Termux er jonno fully customized — install korlei chole.
-Native Android aarch64 build, **no proot, no glibc, no container**.
+OpenCode (AI coding agent) ke Termux e fully customized — **install korlei chole**.
+Native Android aarch64 build: **no proot, no glibc, no container**.
 
-## Requirements
-
-| Item | Detail |
-|------|--------|
-| Phone | ARM64 (aarch64) — modern phone gulo |
-| Termux | **F-Droid version** (`https://f-droid.org/en/packages/com.termux/`) |
-| Internet | ~160MB download |
-
-> Play Store er Termux kaj korbe NA — F-Droid theke install korun.
-
-## Install (one click)
+## Install (one command)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/moradgamer802-cell/voxel-ai-coding/main/install.sh | bash
 ```
 
-Na, locally:
+> **Requirement:** Termux **F-Droid version** (Play Store wala kaj korbe NA) — ARM64 phone.
 
-```bash
-git clone <apnar-repo-url> "$HOME/voxel"
-bash "$HOME/voxel/install.sh"
-```
-
-## What it installs
-
-1. **VOXEL binary** — `guysoft/opencode-termux` latest native Android build
-   (SHA256 verified), command: **`voxel`** (`$PREFIX/bin/voxel`)
-2. **Config** — `~/.config/opencode/opencode.json`: default agent, model, permission
-3. **Custom agent** — `bangla` (Bangla/Banglish e kotha bole)
-4. **Slash commands** — `/dekho`, `/review`, `/fix`, `/model`, `/approve`, `/safe`, `/voxel`
-5. **Theme** — `bangladeshi` (flag green/red), select: voxel er vitore `/theme`
-6. **Skills** — website-builder, ui-ux-responsive, react-next, project-structure, clean-code
-
-## Settings Tool (`oc-settings`)
-
-`oc-settings` installer thekei `$PREFIX/bin` e install hoy — model tier + permission switch
-
-| Command | Kaj |
-|---------|-----|
-| `oc-settings` | Menu (model select) |
-| `oc-settings model` | Model tier popup: Max/Mid/Ultra/Tiny/custom |
-| `oc-settings model max` | Tiers: `max`(default), `mid`, `ultra`, `tiny` (direct) |
-| `oc-settings auto on` | Auto-approve ON — bash/edit prompt chhara chole |
-| `oc-settings auto off` | Ask-mode (safe), prompt abar ashbe |
-| `oc-settings models` | Zen free model list dekhao |
-
-Slash command thekeo: `/model` (tier select), `/approve` (auto-approve on), `/safe` (auto-approve off).
-**Permission change er por voxel restart koro** — config load hoy startup e.
-
-## AI Provider (OpenCode Zen — zero config)
-
-Installer e **OpenCode Zen API key age thekei built-in** — kichu jamate hobe na.
-Display name **`voxel`** (alias provider), actual service OpenCode Zen.
-Default model: `voxel/deepseek-v4-flash-free` (Max default), small model: `voxel/ling-3.0-tiny-free`.
-
-- Free models: `deepseek-v4-flash-free`, `mimo-v2.5-free`, `ling-3.0-*`, `nemotron-3-ultra-free` etc. (`oc-settings models`)
-- Nijer key thakle: `ZEN_API_KEY=<key> bash install.sh` (key override korbe)
-- Model change: `~/.config/opencode/opencode.json` e `"model"` field
-
-⚠️ Note: installer e default key repo te ache (public repo). Nijer security er jonno chaile
-`ZEN_API_KEY` env diye override korun, na repo private korun.
-
-## Customization
-
-| Kono jinish | Ki koro |
-|------|---------|
-| Agent | `~/.config/opencode/agent/bangla.md` edit koro |
-| Command | `~/.config/opencode/command/*.md` add/edit koro |
-| Theme | `~/.config/opencode/themes/bangladeshi.json` edit koro |
-| Config | `~/.config/opencode/opencode.json` edit koro |
-
-**Config change er por voxel restart koro** — config load hoy startup e.
-
-## Compatible phones
+## Overview
 
 | Item | Detail |
 |------|--------|
-| Phone | **aarch64 (ARM64)** only — 32-bit (armv7) phone e kaj korbe NA (openCode binary Bun runtime e build; Bun er Android build shudhu 64-bit) |
-| Android | 7.0+ |
-| Termux | **F-Droid version** required (Play Store wala not supported) |
+| Command | **`voxel`** — AI chole, default workdir `/storage/emulated/0` (booster tomader document/downloads e direkt kaj kore) |
+| AI Provider | **OpenCode Zen — zero config** (key age thekei built-in, kichu jamate hobe na) |
+| Language | **Bangla/Banglish** e kotha bole (default agent `bangla`) |
+| Commands | `/dekho`, `/review`, `/fix`, `/model`, `/approve`, `/safe`, `/voxel` + 5 skills (website-builder, ui-ux, react-next, etc.) |
+
+## Use
+
+```bash
+voxel                 # AI start — ekhuni kaj korte parbe
+/theme                # theme change (bangladeshi default)
+oc-settings           # model tier + permission menu
+```
+
+| Command | Kaj |
+|---------|-----|
+| `oc-settings model` | Model tier: `max` (default) / `mid` / `ultra` / `tiny` |
+| `oc-settings auto on` | Auto-approve ON (prompt chhara chole) |
+| `oc-settings auto off` | Ask-mode (safe) |
+| `oc-settings models` | Zen free model list |
+
+> Model/permission change er por **voxel restart** koro.
+
+## Reinstall / Update
+
+Purono version update korar jonno: same install command abar chalao — sob auto-update hoy.
 
 ## Troubleshooting
 
 - `voxel: command not found` → `pkg install ripgrep` + Termux restart
-- `Bad system call` → purono glibc build thakle; `bash install.sh` abar chalale
-  native build e switch hobe
-- Model error → `source ~/.bashrc` (OPENCODE_API_KEY check: `echo $OPENCODE_API_KEY`),
-  key change: `ZEN_API_KEY=<new> bash install.sh` ar `oc-settings apply`
-- `voxel` e "cannot execute: required file not found" → purono broken wrapper
-  (`~/.opencode/bin/opencode`) confirm: `ls -la ~/.opencode/bin/`; installer auto-fix kore
-  (`.bak` e move), notun terminal khule `voxel` run korun
+- Model error → `source ~/.bashrc` (key check: `echo $OPENCODE_API_KEY`)
+- Install fail → internet check kore `bash install.sh` abar chalao
+
+---
+
+*Full details (customization, keys, phones) repo e investigation er jonno file gulo dekhene —
+installer, config, scripts sob open source.*
