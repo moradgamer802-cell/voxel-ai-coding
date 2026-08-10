@@ -7,13 +7,53 @@ are needed and missing strings are skipped per version. Functional
 bytes (API keys, header names, protocol fields, system prompts) are
 never touched.
 
+Pixel-art rows use fit(): the replacement decodes to the same character
+count (row width used by the layout code) and occupies the same byte
+count (binary layout stays intact).
+
 Usage: patch-brand.py <input.bin> <output.bin>
 """
 
 import sys
 
+# pixel-art wordmark rows (escaped JS strings from the home screen art)
+# -> design rows (decoded unicode). fit() re-encodes to exact length.
+LOGO = [
+    # 8 glyphs "OPENCODE" -> 4 glyphs "ZYVO" (var O / var To, unused on home)
+    (b"\\u2588\\u2580\\u2580\\u2588 \\u2588\\u2580\\u2580\\u2588 \\u2588\\u2580\\u2580\\u2588 "
+     b"\\u2588\\u2580\\u2580\\u2584 \\u2588\\u2580\\u2580\\u2580 \\u2588\\u2580\\u2580\\u2588 "
+     b"\\u2588\\u2580\\u2580\\u2588 \\u2588\\u2580\\u2580\\u2588",
+     "█▀▀█ █  █ █  █ █▀▀█"),
+    (b"\\u2588  \\u2588 \\u2588  \\u2588 \\u2588\\u2580\\u2580\\u2580 \\u2588  \\u2588 "
+     b"\\u2588    \\u2588  \\u2588 \\u2588  \\u2588 \\u2588\\u2580\\u2580\\u2580",
+     "  ▄▀ █▀▀█  ▀▀  █  █"),
+    (b"\\u2580\\u2580\\u2580\\u2580 \\u2588\\u2580\\u2580\\u2580 \\u2580\\u2580\\u2580\\u2580 "
+     b"\\u2580  \\u2580 \\u2580\\u2580\\u2580\\u2580 \\u2580\\u2580\\u2580\\u2580 "
+     b"\\u2580\\u2580\\u2580\\u2580 \\u2580\\u2580\\u2580\\u2580",
+     "▀▀▀▀   █    ▀  ▀▀▀▀"),
+]
+
+# two-tone home-screen logo: left half (dim) "OPEN" -> "ZYV",
+# right half (bright) "CODE" -> "O"
+LOGO_TN = [
+    # left rows -> Z Y V (row 1..3)
+    (b"\\u2588\\u2580\\u2580\\u2588 \\u2588\\u2580\\u2580\\u2588 \\u2588\\u2580\\u2580\\u2588 \\u2588\\u2580\\u2580\\u2584",
+     "█▀▀█ █  █ █  █"),
+    (b"\\u2588__\\u2588 \\u2588__\\u2588 \\u2588^^^ \\u2588__\\u2588",
+     "  ^▀ █^^█  ^▀ "),
+    (b"\\u2580\\u2580\\u2580\\u2580 \\u2588\\u2580\\u2580\\u2580 \\u2580\\u2580\\u2580\\u2580 \\u2580~~\\u2580",
+     "▀▀▀▀   █    ▀ "),
+    # right rows -> single accent O (row 1..3)
+    (b"\\u2588\\u2580\\u2580\\u2580 \\u2588\\u2580\\u2580\\u2588 \\u2588\\u2580\\u2580\\u2588 \\u2588\\u2580\\u2580\\u2588",
+     "█▀▀█"),
+    (b"\\u2588___ \\u2588__\\u2588 \\u2588__\\u2588 \\u2588^^^",
+     "█  █"),
+    (b"\\u2580\\u2580\\u2580\\u2580 \\u2580\\u2580\\u2580\\u2580 \\u2580\\u2580\\u2580\\u2580 \\u2580\\u2580\\u2580\\u2580",
+     "▀▀▀▀"),
+]
+
 # (exact bytes to find, replacement "ZYVO" text) — replace ALL occurrences.
-# New text is auto-padded with spaces to the old length.
+# New text is auto-padded with spaces to the old length (ASCII only).
 PATCHES = [
     # core screens
     (b'setTerminalTitle("OpenCode")',     b'setTerminalTitle("ZYVO")'),
@@ -59,6 +99,38 @@ PATCHES = [
 ]
 
 
+def fit(old: bytes, design: str) -> bytes:
+    """Length-safe replacement for an escaped pixel-art row.
+
+    Old bytes are an escaped JS string. Returns a replacement that
+    (a) decodes to the same number of characters (row width used by the
+    layout code) and (b) occupies the same number of bytes (the rest of
+    the binary stays byte-aligned). Non-ASCII glyphs must be escaped;
+    extra escape slots are filled with escaped spaces.
+    """
+    esc = old.count(b"\\u")
+    dec = esc + (len(old) - esc * 6)
+    g = (len(old) - dec) // 5  # #escapes if the tail is all 1-byte chars
+    l = dec - g
+    assert g * 6 + l == len(old), (len(old), dec, g, l)
+    assert len(design) <= dec, (design, dec)
+    chars = list(design) + [" "] * (dec - len(design))
+    need = [i for i, c in enumerate(chars) if ord(c) > 0x7F]
+    assert len(need) <= g, (design, g, need)
+    esc_idx = set(need)
+    for i, c in enumerate(chars):
+        if len(esc_idx) >= g:
+            break
+        if c == " " and i not in esc_idx:
+            esc_idx.add(i)
+    assert len(esc_idx) == g, (design, g, esc_idx)
+    out = "".join("\\u%04x" % ord(chars[i]) if i in esc_idx else chars[i]
+                  for i in range(len(chars)))
+    out = out.encode()
+    assert len(out) == len(old), (design, len(out), len(old))
+    return out
+
+
 def load(path):
     with open(path, "rb") as f:
         return bytearray(f.read())
@@ -70,6 +142,15 @@ def main():
         sys.exit(1)
     buf = load(sys.argv[1])
     total = 0
+    for old, new in LOGO + LOGO_TN:
+        new = fit(old, new)
+        if old not in buf:
+            print(f"SKIP {old[:52]!r}")
+            continue
+        n = buf.count(old)
+        buf = buf.replace(old, new)
+        total += n
+        print(f"OK x{n}  {old[:52]!r}")
     for old, new in PATCHES:
         if len(new) < len(old):
             new = new + b" " * (len(old) - len(new))
