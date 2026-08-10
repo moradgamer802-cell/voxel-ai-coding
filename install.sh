@@ -39,7 +39,7 @@ dlprogress() { # <url> <out>
     curl_pid=$!
     t0="$(now)" got=0
     while kill -0 "$curl_pid" 2>/dev/null; do
-        got="$(wc -c < "$out" 2>/dev/null || echo 0)"
+        got="$( { [ -f "$out" ] && wc -c < "$out" || true; } 2>/dev/null | awk '{print $1+0}')"
         t1="$(now)"
         speedb=0
         [ "$t1" -gt "$t0" ] && speedb=$(( (got - last) / (t1 - t0) ))
@@ -188,10 +188,14 @@ if command -v pkg >/dev/null 2>&1; then
         fi
         info "installing dependencies (ripgrep git curl unzip tar libc++ figlet python3)..."
         if ! pkg install -y ripgrep git curl unzip tar libc++ figlet python3 >"$TMP/pkg.log" 2>&1; then
-            echo
-            tail -n 5 "$TMP/pkg.log"
-            fatal "pkg install fail — internet check korun, then 'bash install.sh' abar chalao."
-            exit 1
+            info "pkg install fail — index update kore abar try korchi..."
+            pkg update -y >"$TMP/pkg.update.log" 2>&1 || true
+            if ! pkg install -y ripgrep git curl unzip tar libc++ figlet python3 >>"$TMP/pkg.log" 2>&1; then
+                echo
+                tail -n 8 "$TMP/pkg.log"
+                fatal "pkg install fail — bare 'pkg update && pkg install -y ripgrep git curl unzip tar libc++ figlet python3' chalao, then installer abar chalao."
+                exit 1
+            fi
         fi
     fi
 else
