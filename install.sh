@@ -16,6 +16,7 @@ now() { date +%s; }
 say()   { printf "${GREEN}${BOLD}✓${RESET} %s\n" "$1"; }
 info()  { printf "  %s\n" "$1"; }
 fatal() { printf "${RED}${BOLD}[ERR]${RESET} %s\n" "$1"; exit 1; }
+warn()  { printf "${YELLOW}${BOLD}[!!]${RESET} %s\n" "$1"; }
 
 sizeMB() { # bytes -> "2.4 MB"
     awk -v b="$1" 'BEGIN{ printf "%.1f MB", b/1048576 }'
@@ -185,8 +186,8 @@ if command -v pkg >/dev/null 2>&1; then
         else
             info "package index — fresh (skip update)"
         fi
-        info "installing dependencies (ripgrep git curl unzip tar libc++ figlet)..."
-        if ! pkg install -y ripgrep git curl unzip tar libc++ figlet >"$TMP/pkg.log" 2>&1; then
+        info "installing dependencies (ripgrep git curl unzip tar libc++ figlet python3)..."
+        if ! pkg install -y ripgrep git curl unzip tar libc++ figlet python3 >"$TMP/pkg.log" 2>&1; then
             echo
             tail -n 5 "$TMP/pkg.log"
             fatal "pkg install fail — internet check korun, then 'bash install.sh' abar chalao."
@@ -227,7 +228,7 @@ install_core() {
             python3 "$SCRIPT_DIR/scripts/patch-brand.py" opencode.bin opencode.bin.zyvo 2>/dev/null \
                 && mv opencode.bin.zyvo opencode.bin
         else
-            info "python3 nai — brand patch skip"
+            warn "python3 nai — ZYVO branding patch skip hobe (baki sob thik chalbe)"
         fi
     fi
     install -m755 opencode.bin "$PREFIX/libexec/opencode/opencode.bin"
