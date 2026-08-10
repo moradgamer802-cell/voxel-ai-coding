@@ -11,7 +11,10 @@ Pixel-art rows use fit(): the replacement decodes to the same character
 count (row width used by the layout code) and occupies the same byte
 count (binary layout stays intact).
 
-Usage: patch-brand.py <input.bin> <output.bin>
+Usage:
+  patch-brand.py <input.bin> <output.bin>          -- brand (OpenCode -> ZYVO)
+  patch-brand.py <input.bin> <output.bin> --blank-logo  -- erase pixel-art
+    logo rows (all-space rows, same width/bytes, layout unchanged)
 """
 
 import sys
@@ -139,11 +142,54 @@ def load(path):
 
 
 def main():
-    if len(sys.argv) != 3:
+    if len(sys.argv) not in (3, 4) or (len(sys.argv) == 4 and sys.argv[3] != "--blank-logo"):
         print(__doc__)
         sys.exit(1)
     buf = load(sys.argv[1])
     total = 0
+    if len(sys.argv) == 4 and sys.argv[3] == "--blank-logo":
+        # Erase the pixel-art logo: replace every art row (as currently
+        # patched, or the raw unpatched form) with an all-space row of the
+        # same decoded width and byte length. Layout stays intact.
+        for old, design in LOGO + LOGO_TN:
+            cur = fit(old, design)
+            for src, dst in ((cur, fit(cur, "")), (old, fit(old, ""))):
+                if src not in buf:
+                    continue
+                n = buf.count(src)
+                buf = buf.replace(src, dst)
+                total += n
+                print(f"BLANK x{n}  {src[:44]!r}")
+        # accent/top strips of the home + help logo (p.right / O arrays)
+        for row in (b"             \\u2584     ",
+                    b"\\u2800                                \\u2584     "):
+            if row not in buf:
+                print(f"SKIP row {row[:30]!r}")
+                continue
+            n = buf.count(row)
+            buf = buf.replace(row, fit(row, ""))
+            total += n
+            print(f"BLANK x{n}  {row[:30]!r}")
+        # 4-glyph-shape sequences (p/t left/right arrays, bright "O" etc).
+        # NOTE: do NOT touch the "_"/"^" rows of the logo font
+        # ("\\u2588__\\u2588" / "\\u2588_^\\u2588"): editing those two
+        # strings makes the standalone binary fall back to plain Bun CLI.
+        sp = b"\\u0020"
+        for g in (b"\\u2800",
+                  b"\\u2588\\u2580\\u2580\\u2580",
+                  b"\\u2588\\u2580\\u2580\\u2588",
+                  b"\\u2580\\u2580\\u2580\\u2580"):
+            if g not in buf:
+                print(f"SKIP glyph {g!r}")
+                continue
+            n = buf.count(g)
+            buf = buf.replace(g, sp * (len(g) // 6))
+            total += n
+            print(f"BLANK-G x{n} {g!r}")
+        with open(sys.argv[2], "wb") as f:
+            f.write(buf)
+        print(f"blanked {total} logo rows -> {sys.argv[2]}")
+        return
     for old, new in LOGO + LOGO_TN:
         new = fit(old, new)
         if old not in buf:
