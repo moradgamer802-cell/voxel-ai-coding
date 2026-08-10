@@ -1,6 +1,6 @@
 ---
 description: Disable auto-approve — ask mode e fire aao (safe).
-agent: bangla
+agent: build
 ---
 
 Auto-approve OFF korte hobe. $ARGUMENTS

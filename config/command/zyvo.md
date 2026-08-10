@@ -1,6 +1,6 @@
 ---
 description: ZYVO — ASCII banner print koro.
-agent: bangla
+agent: build
 ---
 
 ZYVO banner dekhao. $ARGUMENTS

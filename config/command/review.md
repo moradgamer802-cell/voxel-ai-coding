@@ -1,6 +1,6 @@
 ---
 description: Code review kore — bug, problem, improvement suggestion dey.
-agent: bangla
+agent: build
 ---
 
 Review korbo: $ARGUMENTS

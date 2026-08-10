@@ -1,6 +1,6 @@
 ---
 description: Project er structure explain kore — kotay ki ache, ki kore chole.
-agent: bangla
+agent: build
 ---
 
 Ekhon er project ta explore kore bujho. $ARGUMENTS

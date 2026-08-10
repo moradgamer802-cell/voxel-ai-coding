@@ -1,6 +1,6 @@
 ---
 description: Auto-approve ON — bash/edit prompt chhara, like other CLIs.
-agent: bangla
+agent: build
 ---
 
 Auto-approve permission ON koro. $ARGUMENTS

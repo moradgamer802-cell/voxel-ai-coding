@@ -1,6 +1,6 @@
 ---
 description: Enable auto-approve permissions — bash/edit prompt chhara chole.
-agent: bangla
+agent: build
 ---
 
 Auto-approve ON korte hobe. $ARGUMENTS

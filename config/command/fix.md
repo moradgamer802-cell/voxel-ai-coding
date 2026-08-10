@@ -1,6 +1,6 @@
 ---
 description: Error/bug fix kore — test kore verify kore, tarpor explain kore.
-agent: bangla
+agent: build
 ---
 
 Fix korbo: $ARGUMENTS

@@ -1,6 +1,6 @@
 ---
 description: Model tier select koro — max / mid / ultra / tiny.
-agent: bangla
+agent: build
 ---
 
 User model tier select korbe. $ARGUMENTS

@@ -13,7 +13,7 @@
   },
   "model": "zyvo/deepseek-v4-flash-free",
   "small_model": "zyvo/ling-3.0-tiny-free",
-  "default_agent": "bangla",
+  "default_agent": "build",
   "permission": {
     "bash": "ask",
     "edit": "ask"

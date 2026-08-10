@@ -17,7 +17,7 @@ curl -fsSL https://raw.githubusercontent.com/moradgamer802-cell/zyvo-ai-coding/m
 |------|--------|
 | Command | **`zyvo`** — AI chole, default workdir `/storage/emulated/0` (booster tomader document/downloads e direkt kaj kore) |
 | AI Provider | **OpenCode Zen — zero config** (key age thekei built-in, kichu jamate hobe na) |
-| Language | **Bangla/Banglish** e kotha bole (default agent `bangla`) |
+| Language | **Banglish** e kotha bole (default agent `build`) |
 | Commands | `/dekho`, `/review`, `/fix`, `/model`, `/approve`, `/safe`, `/zyvo` + 5 skills (website-builder, ui-ux, react-next, etc.) |
 
 ## Use

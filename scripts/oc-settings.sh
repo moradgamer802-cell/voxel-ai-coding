@@ -10,7 +10,7 @@
 set -e
 
 CONFIG_DIR="${HOME}/.config/opencode"
-AGENT="bangla"
+AGENT="build"
 USERNAME="deshi-dev"
 
 # Model prefix follows the config that is already in use (opencode|zyvo),
