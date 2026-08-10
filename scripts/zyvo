@@ -1,21 +1,21 @@
 #!/data/data/com.termux/files/usr/bin/sh
-# voxel — wrapper that disables Android bionic TBI heap pointer tagging
+# zyvo — wrapper that disables Android bionic TBI heap pointer tagging
 #
-# The real voxel binary is voxel.bin; this script LD_PRELOAD's libtagfix.so
+# The real zyvo binary is zyvo.bin; this script LD_PRELOAD's libtagfix.so
 # (a constructor that calls mallopt to turn off heap tagging) before exec'ing it.
 # Without this, Bun/JSC's NaN-boxing clears the 0xB4 top-byte tag on heap
 # pointers, causing bionic to SIGABRT on free(): "Pointer tag ... was truncated".
 #
 # Path resolution order (supports both standalone zip and installed package):
-#   zip:      wrapper, voxel.bin, libtagfix.so all live in the same dir
-#   installed: bin/voxel, libexec/opencode/voxel.bin, lib/libtagfix.so
+#   zip:      wrapper, zyvo.bin, libtagfix.so all live in the same dir
+#   installed: bin/zyvo, libexec/opencode/zyvo.bin, lib/libtagfix.so
 
 set -e
 
 dir="$(cd "$(dirname "$0")" && pwd)"
 export ANDROID_ROOT="${ANDROID_ROOT:-/system}"
-export TERMUX_VERSION="${TERMUX_VERSION:-voxel-termux}"
-export TMPDIR="${VOXEL_TMPDIR:-${HOME:-/data/data/com.termux/files/home}/tmp}"
+export TERMUX_VERSION="${TERMUX_VERSION:-zyvo-termux}"
+export TMPDIR="${ZYVO_TMPDIR:-${HOME:-/data/data/com.termux/files/home}/tmp}"
 export TEMP="$TMPDIR"
 export TMP="$TMPDIR"
 export OPENCODE_DISABLE_TUI_AUDIO="${OPENCODE_DISABLE_TUI_AUDIO:-1}"
@@ -29,8 +29,8 @@ if [ "$#" -eq 0 ] && [ "$PWD" = "$HOME" ] && [ -d /storage/emulated/0 ]; then
     export OPENCODE_DEFAULT_DIR=/storage/emulated/0
 fi
 
-# Set the terminal title so the Termux toolbar shows VOXEL
-if ( : >/dev/tty ) 2>/dev/null; then printf '\033]0;VOXEL\007' >/dev/tty 2>/dev/null; fi
+# Set the terminal title so the Termux toolbar shows ZYVO
+if ( : >/dev/tty ) 2>/dev/null; then printf '\033]0;ZYVO\007' >/dev/tty 2>/dev/null; fi
 
 # Locate the native libraries we ship alongside the wrapper.
 # In the flat layout they sit next to the wrapper; in the Termux package
@@ -59,7 +59,7 @@ if [ -n "$NATIVE_LIB_DIR" ]; then
         export OPENCODE_BUN_PATH="$NATIVE_LIB_DIR/bun"
     fi
 else
-    echo "voxel: warning: native library directory not found, may crash on Android 11+" >&2
+    echo "zyvo: warning: native library directory not found, may crash on Android 11+" >&2
 fi
 
 # Locate the real binary. Prefer the package layout first so upgrades do not
@@ -74,5 +74,5 @@ do
     fi
 done
 
-echo "voxel: error: could not find opencode.bin" >&2
+echo "zyvo: error: could not find opencode.bin" >&2
 exit 127

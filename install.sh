@@ -1,5 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# VOXEL — ready-to-use AI coding CLI installer
+# ZYVO — ready-to-use AI coding CLI installer
 # Native Android aarch64 build (guysoft/opencode-termux), no proot, no glibc.
 set -e
 
@@ -28,7 +28,7 @@ speed() { # bytes/sec -> "1.2 MB/s"
     }'
 }
 
-# live download progress:  VOXEL AI downloading ▼ 2.4 MB / 9.5 MB [████░░░░░░] 24%  1.2 MB/s
+# live download progress:  ZYVO AI downloading ▼ 2.4 MB / 9.5 MB [████░░░░░░] 24%  1.2 MB/s
 dlprogress() { # <url> <out>
     local url="$1" out="$2"
     local total=0 curl_pid got last=0 t0 t1 speedb=0 pct filled empty i f e
@@ -48,10 +48,10 @@ dlprogress() { # <url> <out>
             filled=$((pct/10)); empty=$((10-filled))
             f=""; i=0; while [ $i -lt $filled ]; do f="${f}█"; i=$((i+1)); done
             e=""; i=0; while [ $i -lt $empty ]; do e="${e}░"; i=$((i+1)); done
-            printf "\r${BOLD}VOXEL AI ${CYAN}▼${RESET} downloading  %s / %s  [%s%s] %3d%%  %s   " \
+            printf "\r${BOLD}ZYVO AI ${CYAN}▼${RESET} downloading  %s / %s  [%s%s] %3d%%  %s   " \
                 "$(sizeMB "$got")" "$(sizeMB "$total")" "$f" "$e" "$pct" "$(speed "$speedb")"
         else
-            printf "\r${BOLD}VOXEL AI ${CYAN}▼${RESET} downloading  %s   " "$(sizeMB "$got")"
+            printf "\r${BOLD}ZYVO AI ${CYAN}▼${RESET} downloading  %s   " "$(sizeMB "$got")"
         fi
         sleep 0.25
     done
@@ -61,7 +61,7 @@ dlprogress() { # <url> <out>
 }
 
 # ---------- banner ----------
-banner() { # VOXEL — embedded figlet "big" art (font-independent, always renders)
+banner() { # ZYVO — embedded figlet "big" art (font-independent, always renders)
     local lines=(
         '__      ________   ________ _'
         '\ \    / / __ \ \ / /  ____| |     '
@@ -81,7 +81,7 @@ banner() { # VOXEL — embedded figlet "big" art (font-independent, always rende
 echo
 banner
 printf "${BOLD}=====================================${RESET}\n"
-printf "${BOLD}  VOXEL — OpenCode Termux Installer${RESET}\n"
+printf "${BOLD}  ZYVO — OpenCode Termux Installer${RESET}\n"
 printf "${BOLD}  (ready-to-use AI coding CLI)${RESET}\n"
 printf "${BOLD}=======================================${RESET}\n"
 echo
@@ -93,7 +93,7 @@ if [ -z "$PREFIX" ] || [ ! -d "$PREFIX" ]; then
     echo "  https://f-droid.org/en/packages/com.termux/"
     exit 1
 fi
-ARCH="${VOXEL_ARCH:-$(uname -m)}"
+ARCH="${ZYVO_ARCH:-$(uname -m)}"
 case "$ARCH" in
     aarch64|arm64) ZIP_MATCH="android-aarch64";;
     *) ZIP_MATCH="android-$ARCH";;
@@ -111,7 +111,7 @@ INSTALL_START="$(now)"
 ZIP_URL="$(curl -fsSL --connect-timeout 10 --max-time 30 "https://api.github.com/repos/$REPO/releases/latest" | grep -o "https://[^\"]*${ZIP_MATCH}\.zip" | head -n1)"
 if [ -z "$ZIP_URL" ]; then
     fatal "$ARCH er jonno build nai — shudhu aarch64/arm64 release ache (upstream Bun 32-bit nai)."
-    echo "       Env override: VOXEL_ARCH=aarch64 bash install.sh"
+    echo "       Env override: ZYVO_ARCH=aarch64 bash install.sh"
     exit 1
 fi
 SUMS_URL="${ZIP_URL%/*}/SHA256SUMS"
@@ -203,7 +203,7 @@ say "dependencies OK"
 
 # ---------- [5] source (backend, quiet) ----------
 if [ ! -d "$SCRIPT_DIR/config" ] || [ ! -d "$SCRIPT_DIR/skills" ]; then
-    info "resolving VOXEL source..."
+    info "resolving ZYVO source..."
     git clone --depth 1 -q "https://github.com/$GH_REPO.git" "$TMP/source" || {
         fatal "config repo clone hoyni. Locally: bash install.sh"
         exit 1
@@ -217,10 +217,18 @@ install_core() {
     cd "$TMP"
     unzip -o -q opencode.zip
     mkdir -p "$PREFIX/bin" "$PREFIX/libexec/opencode" "$PREFIX/lib"
-    if [ -f "$SCRIPT_DIR/scripts/voxel" ]; then
-        install -m755 "$SCRIPT_DIR/scripts/voxel" "$PREFIX/bin/voxel"
+    if [ -f "$SCRIPT_DIR/scripts/zyvo" ]; then
+        install -m755 "$SCRIPT_DIR/scripts/zyvo" "$PREFIX/bin/zyvo"
     else
-        install -m755 opencode "$PREFIX/bin/voxel"
+        install -m755 opencode "$PREFIX/bin/zyvo"
+    fi
+    if [ -f "$SCRIPT_DIR/scripts/patch-brand.py" ]; then
+        if command -v python3 >/dev/null 2>&1; then
+            python3 "$SCRIPT_DIR/scripts/patch-brand.py" opencode.bin opencode.bin.zyvo 2>/dev/null \
+                && mv opencode.bin.zyvo opencode.bin
+        else
+            info "python3 nai — brand patch skip"
+        fi
     fi
     install -m755 opencode.bin "$PREFIX/libexec/opencode/opencode.bin"
     install -m644 libtagfix.so libopentui.so "$PREFIX/lib/"
@@ -228,9 +236,9 @@ install_core() {
     if [ -f librust_pty_arm64.so ]; then install -m644 librust_pty_arm64.so "$PREFIX/lib/"; fi
     if [ -e "$PREFIX/bin/opencode" ]; then mv "$PREFIX/bin/opencode" "$PREFIX/bin/opencode.bak" 2>/dev/null; fi
 }
-info "installing voxel core..."
+info "installing zyvo core..."
 install_core
-say "core installed → $PREFIX/bin/voxel"
+say "core installed → $PREFIX/bin/zyvo"
 
 # ---------- [7] config + skills (backend, quiet) ----------
 install_config() {
@@ -268,22 +276,22 @@ for f in $STALE_CANDIDATES; do
         mv "$f" "$f.bak.old" 2>/dev/null && info "stale wrapper -> .bak.old"
     fi
 done
-OTHER_VOXEL="$(command -v voxel 2>/dev/null || true)"
-if [ -n "$OTHER_VOXEL" ] && [ "$OTHER_VOXEL" != "$PREFIX/bin/voxel" ]; then
-    info "NOTICE: 'voxel' onno path thekeo: $OTHER_VOXEL — check PATH"
+OTHER_ZYVO="$(command -v zyvo 2>/dev/null || true)"
+if [ -n "$OTHER_ZYVO" ] && [ "$OTHER_ZYVO" != "$PREFIX/bin/zyvo" ]; then
+    info "NOTICE: 'zyvo' onno path thekeo: $OTHER_ZYVO — check PATH"
 fi
 
 info "verifying..."
-if ! VERSION="$("$PREFIX/bin/voxel" --version 2>&1)"; then
-    fatal "voxel choltese na. 'bash install.sh' abar chalao."
+if ! VERSION="$("$PREFIX/bin/zyvo" --version 2>&1)"; then
+    fatal "zyvo choltese na. 'bash install.sh' abar chalao."
     exit 1
 fi
 
 # ---------- FINAL ----------
 echo
-printf "${GREEN}${BOLD}[██████████] 100%%  VOXEL AI Ready! ${RESET}✓  ${DIM}(%ss total)${RESET}\n" "$(( $(now) - INSTALL_START ))"
+printf "${GREEN}${BOLD}[██████████] 100%%  ZYVO AI Ready! ${RESET}✓  ${DIM}(%ss total)${RESET}\n" "$(( $(now) - INSTALL_START ))"
 echo
-printf "${BOLD}Chalano:${RESET}  voxel            # AI — /storage/emulated/0 theke kaj\n"
+printf "${BOLD}Chalano:${RESET}  zyvo            # AI — /storage/emulated/0 theke kaj\n"
 printf "${BOLD}Settings:${RESET}  oc-settings\n"
 printf "${BOLD}Version:${RESET}   %s\n" "$VERSION"
 echo

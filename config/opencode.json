@@ -2,17 +2,17 @@
   "$schema": "https://opencode.ai/config.json",
   "username": "deshi-dev",
   "provider": {
-    "voxel": {
+    "zyvo": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "Voxel (Zen)",
+      "name": "Zyvo (Zen)",
       "options": {
         "baseURL": "https://opencode.ai/zen/v1",
         "apiKey": "{env:OPENCODE_API_KEY}"
       }
     }
   },
-  "model": "voxel/deepseek-v4-flash-free",
-  "small_model": "voxel/ling-3.0-tiny-free",
+  "model": "zyvo/deepseek-v4-flash-free",
+  "small_model": "zyvo/ling-3.0-tiny-free",
   "default_agent": "bangla",
   "permission": {
     "bash": "ask",

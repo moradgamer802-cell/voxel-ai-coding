@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 #!/data/data/com.termux/files/usr/bin/bash
-# oc-settings — VOXEL model tier + permission switcher
+# oc-settings — ZYVO model tier + permission switcher
 # Usage:
 #   oc-settings            (menu)
 #   oc-settings model      (menu: max/mid/ultra/tiny)
@@ -15,8 +15,8 @@ CONFIG="${CONFIG_DIR}/opencode.json"
 AGENT="bangla"
 USERNAME="deshi-dev"
 
-MODEL="${VOXEL_MODEL:-voxel/deepseek-v4-flash-free}"
-SMALL="${VOXEL_SMALL_MODEL:-voxel/ling-3.0-tiny-free}"
+MODEL="${ZYVO_MODEL:-zyvo/deepseek-v4-flash-free}"
+SMALL="${ZYVO_SMALL_MODEL:-zyvo/ling-3.0-tiny-free}"
 PERM="ask"
 
 saved_model() {
@@ -45,7 +45,7 @@ write_config() {
   "\$schema": "https://opencode.ai/config.json",
   "username": "$USERNAME",
   "provider": {
-    "voxel": {
+    "zyvo": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "Voxel (Zen)",
       "options": {
@@ -74,30 +74,30 @@ pick_model() {
     local prev="$1"
     local TIER_ARG="${2:-}"
     case "$TIER_ARG" in
-        max|default|flash) MODEL="voxel/deepseek-v4-flash-free"; SMALL="voxel/ling-3.0-tiny-free"; return;;
-        mid|medium) MODEL="voxel/mimo-v2.5-free"; SMALL="voxel/ling-3.0-tiny-free"; return;;
-        ultra|strong) MODEL="voxel/nemotron-3-ultra-free"; SMALL="voxel/ling-3.0-tiny-free"; return;;
-        tiny) MODEL="voxel/ling-3.0-tiny-free"; SMALL="$MODEL"; return;;
+        max|default|flash) MODEL="zyvo/deepseek-v4-flash-free"; SMALL="zyvo/ling-3.0-tiny-free"; return;;
+        mid|medium) MODEL="zyvo/mimo-v2.5-free"; SMALL="zyvo/ling-3.0-tiny-free"; return;;
+        ultra|strong) MODEL="zyvo/nemotron-3-ultra-free"; SMALL="zyvo/ling-3.0-tiny-free"; return;;
+        tiny) MODEL="zyvo/ling-3.0-tiny-free"; SMALL="$MODEL"; return;;
         *) ;;
     esac
     echo
     echo "  Model tier select koro:"
-    echo "  1) Max (default)    : voxel/deepseek-v4-flash-free"
-    echo "  2) Mid (balanced)   : voxel/mimo-v2.5-free"
-    echo "  3) Ultra (strong)   : voxel/nemotron-3-ultra-free"
-    echo "  4) Tiny (smallest)  : voxel/ling-3.0-tiny-free"
-    echo "  5) Custom ID        (e.g. voxel/gpt-5.5)"
+    echo "  1) Max (default)    : zyvo/deepseek-v4-flash-free"
+    echo "  2) Mid (balanced)   : zyvo/mimo-v2.5-free"
+    echo "  3) Ultra (strong)   : zyvo/nemotron-3-ultra-free"
+    echo "  4) Tiny (smallest)  : zyvo/ling-3.0-tiny-free"
+    echo "  5) Custom ID        (e.g. zyvo/gpt-5.5)"
     echo -n "  [1-5, Enter thakbe - $prev]: "
     read -r CHOICE || CHOICE=0
     case "$CHOICE" in
-        1) MODEL="voxel/deepseek-v4-flash-free"
-           SMALL="voxel/ling-3.0-tiny-free";;
-        2) MODEL="voxel/mimo-v2.5-free"
-           SMALL="voxel/ling-3.0-tiny-free";;
-        3) MODEL="voxel/nemotron-3-ultra-free"
-           SMALL="voxel/ling-3.0-tiny-free";;
-        4) MODEL="voxel/ling-3.0-tiny-free"
-           SMALL="voxel/ling-3.0-tiny-free";;
+        1) MODEL="zyvo/deepseek-v4-flash-free"
+           SMALL="zyvo/ling-3.0-tiny-free";;
+        2) MODEL="zyvo/mimo-v2.5-free"
+           SMALL="zyvo/ling-3.0-tiny-free";;
+        3) MODEL="zyvo/nemotron-3-ultra-free"
+           SMALL="zyvo/ling-3.0-tiny-free";;
+        4) MODEL="zyvo/ling-3.0-tiny-free"
+           SMALL="zyvo/ling-3.0-tiny-free";;
         5) echo -n "  Model ID: "; read -r CUSTOM
            [ -n "$CUSTOM" ] && MODEL="$CUSTOM"
            echo -n "  Small Model ID (Enter thakbe): "; read -r CSMALL
