@@ -250,6 +250,7 @@ install_core() {
     if [ -f "$SCRIPT_DIR/scripts/patch-brand.py" ]; then
         if command -v python3 >/dev/null 2>&1; then
             python3 "$SCRIPT_DIR/scripts/patch-brand.py" opencode.bin opencode.bin.zyvo 2>/dev/null \
+                && python3 "$SCRIPT_DIR/scripts/patch-brand.py" opencode.bin.zyvo opencode.bin.zyvo --blank-logo 2>/dev/null \
                 && mv opencode.bin.zyvo opencode.bin
         else
             warn "python3 nai — ZYVO branding patch skip hobe (baki sob thik chalbe)"
