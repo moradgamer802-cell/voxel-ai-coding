@@ -191,10 +191,30 @@ if command -v pkg >/dev/null 2>&1; then
             info "pkg install fail — index update kore abar try korchi..."
             pkg update -y >"$TMP/pkg.update.log" 2>&1 || true
             if ! pkg install -y ripgrep git curl unzip tar libc++ figlet python3 >>"$TMP/pkg.log" 2>&1; then
-                echo
-                tail -n 8 "$TMP/pkg.log"
-                fatal "pkg install fail — bare 'pkg update && pkg install -y ripgrep git curl unzip tar libc++ figlet python3' chalao, then installer abar chalao."
-                exit 1
+                # broken mirror fallback: switch to the official Termux repo and retry once
+                if [ -f "$PREFIX/etc/apt/sources.list" ] \
+                   && ! grep -q "packages.termux.dev" "$PREFIX/etc/apt/sources.list" 2>/dev/null; then
+                    info "mirror broken lagche — official Termux repo te switch korchi..."
+                    cp "$PREFIX/etc/apt/sources.list" "$PREFIX/etc/apt/sources.list.zyvo.bak" 2>/dev/null || true
+                    mkdir -p "$PREFIX/etc/apt/sources.list.d"
+                    mv "$PREFIX"/etc/apt/sources.list.d/*.sources "$PREFIX/etc/apt/sources.list.d/" 2>/dev/null || true
+                    rm -f "$PREFIX"/etc/apt/sources.list.d/*.list "$PREFIX"/etc/apt/sources.list.d/*.sources
+                    echo "deb https://packages.termux.dev/apt/termux-main stable main" > "$PREFIX/etc/apt/sources.list"
+                    pkg update -y >>"$TMP/pkg.update.log" 2>&1 || true
+                    if pkg install -y ripgrep git curl unzip tar libc++ figlet python3 >>"$TMP/pkg.log" 2>&1; then
+                        say "dependencies installed (official repo)"
+                    else
+                        echo
+                        tail -n 8 "$TMP/pkg.log"
+                        fatal "pkg install fail — official repo eo fail. Internet/mirror check korun."
+                        exit 1
+                    fi
+                else
+                    echo
+                    tail -n 8 "$TMP/pkg.log"
+                    fatal "pkg install fail — mirror change kore dekhun: 'termux-change-repo', then installer abar chalao."
+                    exit 1
+                fi
             fi
         fi
     fi
