@@ -274,7 +274,7 @@ install_config() {
     fi
     install -m644 "$SCRIPT_DIR/config/opencode.json" "$CONFIG_DIR/opencode.json"
     install -m644 "$SCRIPT_DIR/config/agent/"*.md "$CONFIG_DIR/agent/" 2>/dev/null || true
-    install -m644 "$SCRIPT_DIR/config/command/"*.md "$CONFIG_DIR/command/" 2>/dev/null || true
+    install -m644 "$SCRIPT_DIR/config/command/"*.md "$CONFIG_DIR/commands/" 2>/dev/null || true
     install -m644 "$SCRIPT_DIR/config/themes/"*.json "$CONFIG_DIR/themes/" 2>/dev/null || true
     cp -rn "$SCRIPT_DIR/skills/"* "$CONFIG_DIR/skills/" 2>/dev/null || true
     if [ -f "$SCRIPT_DIR/scripts/oc-settings.sh" ]; then
