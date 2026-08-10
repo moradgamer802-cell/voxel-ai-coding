@@ -96,6 +96,8 @@ PATCHES = [
     (b'Thank you for using OpenCode!',     b'Thank you for using ZYVO!'),
     (b'Successfully updated to OpenCode v',
      b'Successfully updated to ZYVO v'),
+    # TUI session list "Continue" hint:  opencode -s <id> -> zyvo -s <id>
+    (b'opencode -s ${U.sessionID}',        b'zyvo -s ${U.sessionID}'),
 ]
 
 
