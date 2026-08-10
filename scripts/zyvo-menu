@@ -1,0 +1,96 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# zyvo-menu — optional branded launcher for ZYVO on Termux.
+#
+# Safe way to start ZYVO: every option below exec's the real zyvo wrapper
+# (which sets LD_PRELOAD=libtagfix.so + all env). If zyvo is not on PATH,
+# paper over it with a direct opencode.bin launch using the same env chain.
+#
+# Note: /model, /theme and /auto are TUI-internal commands — they can't be
+# run from a shell. The menu prints the exact keys to press inside the TUI.
+
+set -e
+
+PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+
+find_zyvo() {
+    for c in \
+        "$PREFIX/bin/zyvo" \
+        "$PREFIX/libexec/opencode/zyvo.bin" \
+        "$PREFIX/libexec/opencode/opencode.bin"
+    do
+        [ -x "$c" ] && { echo "$c"; return 0; }
+    done
+    return 1
+}
+
+launch() { # run the real wrapper with args ($1 = bin, rest = args)
+    bin="$1"; shift
+    if [ "$(basename "$bin")" = "zyvo" ]; then
+        exec "$bin" "$@"
+    else
+        # raw binary: replicate the wrapper env chain
+        export ANDROID_ROOT="${ANDROID_ROOT:-/system}"
+        export OPENCODE_DISABLE_TUI_AUDIO="${OPENCODE_DISABLE_TUI_AUDIO:-1}"
+        export TMPDIR="${ZYVO_TMPDIR:-${HOME:-/data/data/com.termux/files/home}/tmp}"
+        mkdir -p "$TMPDIR" 2>/dev/null || true
+        if [ -f "$PREFIX/lib/libtagfix.so" ]; then
+            export LD_PRELOAD="$PREFIX/lib/libtagfix.so${LD_PRELOAD:+:$LD_PRELOAD}"
+            export LD_LIBRARY_PATH="$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+        fi
+        exec "$bin" "$@"
+    fi
+}
+
+BIN="$(find_zyvo || true)"
+
+menu() {
+    printf '\033[1;96m=== ZYVO launcher ===\033[0m\n'
+    printf '  1) Chat (new session)\n'
+    printf '  2) Chat:  /model /theme /auto  keys??\n'
+    printf '  3) Version\n'
+    printf '  4) Update ZYVO\n'
+    printf '  5) Headless server (serve)\n'
+    printf '  6) Plugins\n'
+    printf '  7) Trust a folder\n'
+    printf '  8) Exit\n'
+    printf 'Choose [1-8]: '
+}
+
+while :; do
+    menu
+    read -r choice
+    case "$choice" in
+        1)
+            [ -n "$BIN" ] || { echo "zyvo not found — run install.sh first" >&2; exit 1; }
+            launch "$BIN"
+            ;;
+        2)
+            printf '\nInside the ZYVO TUI:\n  Ctrl+K  -> command palette (type /model, /theme)\n  Ctrl+K then /auto  -> auto-approve permissions\n  Esc  -> main menu   Ctrl+O  -> accept\nPress any key to return to menu...\n'
+            read -r _
+            ;;
+        3)
+            if [ -n "$BIN" ]; then launch "$BIN" --version; else echo "zyvo not installed"; fi
+            read -r _ || true
+            ;;
+        4)
+            echo "Run: sh $PREFIX/../share/zyvo/install.sh   (or re-download the installer)" 
+            read -r _ || true
+            ;;
+        5)
+            [ -n "$BIN" ] || { echo "zyvo not found" >&2; exit 1; }
+            launch "$BIN" serve 2>/dev/null || launch "$BIN" serve --port 4020
+            ;;
+        6)
+            [ -n "$BIN" ] || { echo "zyvo not found" >&2; exit 1; }
+            launch "$BIN" plugin
+            ;;
+        7)
+            printf 'Folder to trust: '
+            read -r folder
+            [ -n "$BIN" ] || { echo "zyvo not found" >&2; exit 1; }
+            launch "$BIN" trust include "$folder"
+            ;;
+        8) exit 0 ;;
+        *) ;;
+    esac
+done
