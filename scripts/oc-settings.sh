@@ -47,7 +47,7 @@ write_config() {
   "provider": {
     "zyvo": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "Voxel (Zen)",
+      "name": "Zyvo (Zen)",
       "options": {
         "baseURL": "https://opencode.ai/zen/v1",
         "apiKey": "{env:OPENCODE_API_KEY}"

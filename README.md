@@ -6,7 +6,7 @@ Native Android aarch64 build: **no proot, no glibc, no container**.
 ## Install (one command)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/moradgamer802-cell/voxel-ai-coding/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/moradgamer802-cell/zyvo-ai-coding/main/install.sh | bash
 ```
 
 > **Requirement:** Termux **F-Droid version** (Play Store wala kaj korbe NA) — ARM64 phone.
