@@ -274,6 +274,7 @@ install_config() {
         cp -n "$CONFIG_DIR/opencode.jsonc" "$CONFIG_DIR/opencode.jsonc.bak" 2>/dev/null || true
     fi
     install -m644 "$SCRIPT_DIR/config/opencode.json" "$CONFIG_DIR/opencode.json"
+    install -m644 "$SCRIPT_DIR/config/tui.json" "$CONFIG_DIR/tui.json" 2>/dev/null || true
     install -m644 "$SCRIPT_DIR/config/agent/"*.md "$CONFIG_DIR/agent/" 2>/dev/null || true
     install -m644 "$SCRIPT_DIR/config/command/"*.md "$CONFIG_DIR/commands/" 2>/dev/null || true
     install -m644 "$SCRIPT_DIR/config/themes/"*.json "$CONFIG_DIR/themes/" 2>/dev/null || true
