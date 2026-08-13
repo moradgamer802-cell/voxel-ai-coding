@@ -221,18 +221,51 @@ if command -v pkg >/dev/null 2>&1; then
 else
     info "WARNING: pkg nai — existing deps check..."
 fi
-for dep in rg git curl unzip tar; do
+for dep in rg curl unzip tar; do
     command -v "$dep" >/dev/null 2>&1 || fatal "$dep missing — pkg install -y $dep"
 done
+command -v git >/dev/null 2>&1 || info "WARNING: git nai — source curl diye namabo (git lagbe na)."
 say "dependencies OK"
 
 # ---------- [5] source (backend, quiet) ----------
 if [ ! -d "$SCRIPT_DIR/config" ] || [ ! -d "$SCRIPT_DIR/skills" ]; then
     info "resolving ZYVO source..."
-    git clone --depth 1 -q "https://github.com/$GH_REPO.git" "$TMP/source" || {
-        fatal "config repo clone hoyni. Locally: bash install.sh"
-        exit 1
+    fetch_source() {
+        # 1) primary: plain HTTPS tarball via curl (no git needed — avoids Termux
+        #    broken git-remote-https / openssl+ngtcp2 symbol errors)
+        for br in main master; do
+            if curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 300 \
+                -o "$TMP/source.tar.gz" "https://codeload.github.com/$GH_REPO/tar.gz/refs/heads/$br" 2>/dev/null; then
+                mkdir -p "$TMP/source"
+                if tar -xzf "$TMP/source.tar.gz" -C "$TMP/source" --strip-components=1 2>/dev/null; then
+                    [ -d "$TMP/source/config" ] && return 0
+                fi
+                rm -rf "$TMP/source" "$TMP/source.tar.gz"
+            fi
+        done
+        # 2) fallback: zip (same host, no git)
+        for br in main master; do
+            if curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 300 \
+                -o "$TMP/source.zip" "https://codeload.github.com/$GH_REPO/zip/refs/heads/$br" 2>/dev/null; then
+                rm -rf "$TMP/srcz"; mkdir -p "$TMP/srcz"
+                if unzip -o -q "$TMP/source.zip" -d "$TMP/srcz" 2>/dev/null; then
+                    d="$(find "$TMP/srcz" -maxdepth 1 -mindepth 1 -type d | head -n1)"
+                    if [ -n "$d" ] && [ -d "$d/config" ]; then
+                        rm -rf "$TMP/source"; mv "$d" "$TMP/source"; return 0
+                    fi
+                fi
+                rm -rf "$TMP/srcz" "$TMP/source.zip"
+            fi
+        done
+        # 3) last resort: git clone (only if git actually works here)
+        if command -v git >/dev/null 2>&1; then
+            git clone --depth 1 -q "https://github.com/$GH_REPO.git" "$TMP/source" 2>/dev/null \
+                && [ -d "$TMP/source/config" ] && return 0
+            rm -rf "$TMP/source"
+        fi
+        return 1
     }
+    fetch_source || fatal "source namate parlam na — internet check koro, ba locally: bash install.sh"
     SCRIPT_DIR="$TMP/source"
 fi
 say "source resolved"
