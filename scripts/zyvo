@@ -29,21 +29,21 @@ export OPENCODE_DISABLE_TUI_AUDIO="${OPENCODE_DISABLE_TUI_AUDIO:-1}"
 mkdir -p "$TMPDIR" 2>/dev/null || true
 
 # ---- permission mode flags + named session ----
-# zyvo --yolo / -y        : Always Allow (session) — ei session e ar kono
-#                           dhoroner permission prompt ashbe na; exit e auto safe.
-# zyvo --safe / --ask     : normal ask-mode (default) — explicit override.
-# zyvo session            : session list dekhao
-# zyvo session <naam>     : oi naamer session khulo/notun banao — folder
-#                           soho <base>/zyvo/<naam>/ er modde, chat history
-#                           auto-resume (--continue). Flags age pore jekono
-#                           order e: zyvo -y session 1 kaj kore.
-YOLO=0
+# DEFAULT: auto-allow — ei session e ar kono dhoroner permission prompt
+#   ashbe na (temp config, session sesh hole automatically sesh).
+# zyvo --safe / --ask : prompt mode — TUI te Allow once / Always allow /
+#   Reject dialog ashbe (global config er permission follow hoy).
+# zyvo session        : session list dekhao
+# zyvo session <naam> : oi naamer session khulo/notun banao — folder soho
+#   <base>/zyvo/<naam>/ er modde, chat history auto-resume (--continue).
+#   Flags age pore jekono order e: zyvo -y session 1 kaj kore.
+YOLO=1
 SESSION_MODE=0
 SESSION_NAME=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --yolo|-y) YOLO=1; shift; continue;;
-        --safe|--ask) shift; continue;;
+        --safe|--ask) YOLO=0; shift; continue;;
         session|sessions)
             SESSION_MODE=1; shift
             [ "$#" -gt 0 ] && { SESSION_NAME="$1"; shift; }
@@ -159,8 +159,7 @@ if [ "$YOLO" = 1 ]; then
 EOF
     [ -n "$OPENCODE_CONFIG" ] && echo "zyvo: note: OPENCODE_CONFIG chhilo, session-perm replace koreche" >&2
     export OPENCODE_CONFIG="$SESSION_FILE"
-    echo "zyvo: SESSION-ALLOW ON — ei session e ar kono permission prompt ashbe na." >&2
-    echo "zyvo: exit korle auto safe-mode (ask) e fire jabe." >&2
+    echo "zyvo: auto-allow ON — ei session e kono permission prompt ashbe na (safe: zyvo --safe)" >&2
 fi
 
 # ---- in-chat session mode (/auto) auto-restore ----

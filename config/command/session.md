@@ -1,11 +1,13 @@
 ---
-description: "Session mode check — ei session e ar kono permission prompt chaibe na."
+description: "Session permission check — ekhon prompt ashe kina."
 agent: build
 ---
 
-SESSION MODE check/info korte hobe. $ARGUMENTS
+Session permission check korte hobe. $ARGUMENTS
 
-1. `oc-settings session status` chalale koro.
-2. Status ON thakle bolo: "Session mode ON ✓ — ar kono permission prompt ashbe na. Zyvo band korle auto safe-mode."
-3. Status off thakle bolo (ek line): "Session mode OFF. On korte: `/auto` likho (ba `/approve`) — ekhuni ar kono prompt ashbe na."
+1. `echo "$OPENCODE_CONFIG"` chalale koro.
+2. Jodi `zyvo-session-perm.json` thake → bolo (ek line):
+   "Auto-allow ON ✓ — kono permission prompt ashbe na. Zyvo band korleo porer session default ei thakbe."
+3. Na thakle (mane `zyvo --safe` mode e cholo) → bolo (ek line):
+   "Ekhon safe mode e — Allow once / Always allow / Reject prompt ashbe. Auto-allow e firte normal `zyvo` diye chalao."
 4. Onno kono explanation bolo na.

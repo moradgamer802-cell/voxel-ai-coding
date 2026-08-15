@@ -8,7 +8,7 @@
 #   oc-settings perm ask        (sob ask — safe default)
 #   oc-settings perm allow      (Always Allow — bash/edit/webfetch persistent allow)
 #   oc-settings perm deny       (bash deny — AI command chalate parbe na, read-only)
-#   oc-settings auto on         (session mode ON — /auto command er kaj)
+#   oc-settings auto on         (config-mode session allow — --safe run er jonno)
 #   oc-settings auto off        (safe: session off + ask mode)
 #   oc-settings session on      (in-chat session mode ON — /auto er kaj)
 #   oc-settings session off     (restore — purano permission mode e fire)
@@ -165,30 +165,31 @@ PY
 
 session_info() {
     echo
-    echo "  SESSION MODE — Always Allow (ei session only)"
+    echo "  SESSION PERMISSION — ei session e prompt ashbe kina"
     echo "  ─────────────────────────────────────────────"
     if echo "${OPENCODE_CONFIG:-}" | grep -q "zyvo-session-perm.json"; then
-        echo "  Status: ON (yolo mode — zyvo --yolo diye chalu)"
-        echo "  Exit korle auto safe-mode (ask) e fire jabe."
+        echo "  Status: AUTO-ALLOW ON (zyvo default mode)"
+        echo "  Kono permission prompt ashbe na."
+        echo "  Prompt chaile: zyvo --safe diye chalao."
     elif [ -f "$STATE_FILE" ]; then
-        echo "  Status: ON (/auto ba /approve diye chalu)"
-        echo "  Zyvo exit korle auto safe-mode e restore hobe."
+        echo "  Status: AUTO-ALLOW ON (config mode — oc-settings auto on)"
+        echo "  Zyvo exit korle auto restore hobe."
     else
-        echo "  Status: off"
-        echo
-        echo "  On korte (in-chat):  /auto   (ba /approve)"
-        echo "  Start thekei:         zyvo --yolo"
-        echo "  Persistent allow:     oc-settings perm allow"
+        echo "  Status: PROMPT MODE (zyvo --safe / global config ask)"
+        echo "  Allow once / Always allow / Reject dialog ashbe."
+        echo "  Auto-allow e firte: normal zyvo diye chalao."
+        echo "  Sob session e allow chaile: oc-settings perm allow"
     fi
 }
 
 perm_menu() {
     echo
-    echo "  Permission mode select koro  [ekhon: $(current_perm || echo '?')]"
-    echo "  1) Ask (safe)           — sob kaj e prompt korbe (default)"
+    echo "  Permission mode select koro  [config: $(current_perm || echo '?')]"
+    echo "  (zyvo normal mode = auto-allow; ei config --safe mode e kaj kore)"
+    echo "  1) Ask (safe)           — sob kaj e prompt korbe"
     echo "  2) Always Allow         — bash/edit/webfetch permanent allow (prompt chhara)"
     echo "  3) Deny bash (readonly) — AI command chalate parbe na (read/edit kaj kore)"
-    echo "  4) Session info         — ei session e ar prompt chaibe na (zyvo --yolo)"
+    echo "  4) Session status       — ekhon prompt ashbe kina"
     echo -n "  [1-4]: "
     read -r CHOICE || CHOICE=""
     case "$CHOICE" in

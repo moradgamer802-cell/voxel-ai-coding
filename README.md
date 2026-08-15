@@ -23,24 +23,25 @@ curl -fsSL https://raw.githubusercontent.com/moradgamer802-cell/zyvo-ai-coding/m
 | WSL / desktop Linux / macOS | Official build auto-install |
 | 32-bit phone (armv7) | Binary nai — installer clear message dekhabe |
 
-## Permission system (4 option)
+## Permission system
 
-Jokhon AI kono kaj kore (command/file edit/web), permission ashe:
-
-| Option | Kaj |
-|--------|-----|
-| **Allow** | Ekbar allow — TUI prompt e chapo |
-| **Always Allow** | bash/edit/webfetch sob **persistent** allow: `oc-settings perm allow` |
-| **Deny** | Ekbar reject — TUI prompt e; bash **sob deny** (readonly): `oc-settings perm deny` |
-| **Always Allow (session)** | In-chat **`/auto`** (ba `/approve`) — **ei session e ar KONO permission prompt ashbe na**; zyvo band korle auto safe-mode. Start theke chaile: `zyvo --yolo` |
+**Default: auto-allow** — `zyvo` normal mode e **kono permission prompt ashbe na**
+(sob kaj AI nije chalay). Prompt dekhte chaile:
 
 ```bash
-/auto                # in-chat: session mode ON — ekhuni ar prompt nai
-zyvo --yolo          # session mode from start (temp config, zero-trace)
-zyvo -y              # short version
-oc-settings perm     # interactive menu (ask / always / deny / session)
+zyvo                 # AI start — auto-allow (prompt nai, default)
+zyvo --safe          # prompt mode — Allow once / Always allow / Reject dialog
+zyvo session <naam>  # notun/resume session — zyvo/<naam>/ folder e
+oc-settings perm     # interactive permission menu
 /perm  /session  /safe   # in-chat commands
 ```
+
+| Mode | kivabe | kaj |
+|------|--------|-----|
+| **Auto-allow** (default) | normal `zyvo` | Ei session e kono prompt nai — sob allow. Session sesh = sesh, kichhu leke thake na |
+| **Prompt mode** | `zyvo --safe` | TUI te Allow once / Always allow / Reject ashbe |
+| **Always allow** (sob session) | `oc-settings perm allow` | Permanent config |
+| **Deny bash** (readonly) | `oc-settings perm deny` | AI command chalate parbe na |
 
 ## Overview
 
@@ -49,13 +50,13 @@ oc-settings perm     # interactive menu (ask / always / deny / session)
 | Command | **`zyvo`** — AI chole, default workspace `/storage/emulated/0/zyvo` (dedicated folder — fast, phone halka thake). Onno folder e: `zyvo /storage/emulated/0/Documents` |
 | AI Provider | **OpenCode Zen — zero config** (key age thekei built-in, kichu jamate hobe na) |
 | Language | **Banglish** e kotha bole (default agent `build`) |
-| Commands | `/dekho`, `/review`, `/fix`, `/model`, `/perm`, `/session`, `/approve`, `/safe`, `/zyvo` + 9 skills |
+| Commands | `/dekho`, `/review`, `/fix`, `/model`, `/perm`, `/session`, `/safe`, `/zyvo` + 9 skills |
 
 ## Use
 
 ```bash
-zyvo                 # AI start — ekhuni kaj korte parbe (ask-mode, safe)
-zyvo --yolo          # session mode — permission prompt chhara
+zyvo                 # AI start — auto-allow mode (prompt nai)
+zyvo --safe          # prompt mode (Allow once / Always allow / Reject)
 zyvo session         # session list
 zyvo session proj1   # notun/resume session "proj1" — zyvo/proj1/ folder e
 oc-settings          # model tier + permission menu
@@ -79,7 +80,7 @@ age ki bolse chilo AI mone rakhbe (`--continue`). Naam e sudhu
 |---------|-----|
 | `oc-settings model` | Model tier: `max` (default) / `mid` / `ultra` / `tiny` |
 | `oc-settings perm` | Permission menu: ask / always allow / deny / session |
-| `oc-settings auto on` | Session mode ON (ei session e prompt nai) |
+| `oc-settings auto on` | Config-mode session allow (`--safe` run er jonno) |
 | `oc-settings auto off` | Safe mode (session off + ask) |
 | `oc-settings models` | Zen free model list |
 
