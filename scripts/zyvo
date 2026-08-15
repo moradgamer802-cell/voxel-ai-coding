@@ -6,9 +6,16 @@
 # Without this, Bun/JSC's NaN-boxing clears the 0xB4 top-byte tag on heap
 # pointers, causing bionic to SIGABRT on free(): "Pointer tag ... was truncated".
 #
+# Session-permission mode (zyvo --yolo):
+#   Writes a temp config with permission = allow and points OPENCODE_CONFIG at
+#   it. OpenCode merges that file ON TOP of the global config, so this session
+#   never asks for permission — and because it is a temp file only this process
+#   sees, exiting zyvo automatically returns to safe ask-mode. Nothing to undo.
+#
 # Path resolution order (supports both standalone zip and installed package):
 #   zip:      wrapper, zyvo.bin, libtagfix.so all live in the same dir
 #   installed: bin/zyvo, libexec/opencode/zyvo.bin, lib/libtagfix.so
+#   glibc Linux (Ubuntu proot etc.): ~/.local/bin/zyvo, ~/.local/libexec/zyvo/
 
 set -e
 
@@ -21,24 +28,41 @@ export TMP="$TMPDIR"
 export OPENCODE_DISABLE_TUI_AUDIO="${OPENCODE_DISABLE_TUI_AUDIO:-1}"
 mkdir -p "$TMPDIR" 2>/dev/null || true
 
+# ---- permission mode flag (first argument only) ----
+# zyvo --yolo / -y / --session-allow : Always Allow (session) — ei session e
+#   ar kono dhoroner permission prompt ashbe na; exit korle auto safe-mode.
+# zyvo --safe / --ask : normal ask-mode (default) — explicit override.
+YOLO=0
+case "${1:-}" in
+    --yolo|-y|--session-allow|--session) YOLO=1; shift;;
+    --safe|--ask) shift;;
+esac
+
 # Default workspace: when launched without a directory argument from the
-# plain Termux home, boot inside Android shared storage (/storage/emulated/0)
-# so the AI searches the user's real files — documents, downloads, etc.
-if [ "$#" -eq 0 ] && [ "$PWD" = "$HOME" ] && [ -d /storage/emulated/0 ]; then
-    cd /storage/emulated/0
-    export OPENCODE_DEFAULT_DIR=/storage/emulated/0
+# plain home, boot inside Android shared storage so the AI searches the
+# user's real files — documents, downloads, etc.
+# (/sdcard alias covers proot distros where /storage/emulated/0 may differ.)
+if [ "$#" -eq 0 ] && [ "$PWD" = "$HOME" ]; then
+    if [ -d /storage/emulated/0 ]; then
+        cd /storage/emulated/0
+        export OPENCODE_DEFAULT_DIR=/storage/emulated/0
+    elif [ -d /sdcard ]; then
+        cd /sdcard
+        export OPENCODE_DEFAULT_DIR=/sdcard
+    fi
 fi
 
-# Set the terminal title so the Termux toolbar shows ZYVO
+# Set the terminal title so the toolbar shows ZYVO
 if ( : >/dev/tty ) 2>/dev/null; then printf '\033]0;ZYVO\007' >/dev/tty 2>/dev/null; fi
 
 # Locate the native libraries we ship alongside the wrapper.
 # In the flat layout they sit next to the wrapper; in the Termux package
-# layout they are under ../lib.
+# layout they are under ../lib; on glibc Linux under ~/.local/lib/zyvo.
 NATIVE_LIB_DIR=""
 for candidate in \
     "$dir/../lib" \
     "${PREFIX:-/data/data/com.termux/files/usr}/lib" \
+    "$HOME/.local/lib/zyvo" \
     "$dir"
 do
     if [ -f "$candidate/libtagfix.so" ]; then
@@ -58,16 +82,40 @@ if [ -n "$NATIVE_LIB_DIR" ]; then
     if [ -x "$NATIVE_LIB_DIR/bun" ]; then
         export OPENCODE_BUN_PATH="$NATIVE_LIB_DIR/bun"
     fi
-else
+elif [ -n "$PREFIX" ] && [ -d "$PREFIX" ]; then
+    # only warn on real Termux — glibc Linux e native lib lagbe na
     echo "zyvo: warning: native library directory not found, may crash on Android 11+" >&2
+fi
+
+# ---- SESSION-ALLOW: apply BEFORE exec so this process only sees it ----
+if [ "$YOLO" = 1 ]; then
+    SESSION_FILE="$TMPDIR/zyvo-session-perm.json"
+    cat > "$SESSION_FILE" <<'EOF'
+{
+  "permission": {
+    "bash": "allow",
+    "edit": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "external_directory": "allow",
+    "doom_loop": "allow"
+  }
+}
+EOF
+    [ -n "$OPENCODE_CONFIG" ] && echo "zyvo: note: OPENCODE_CONFIG chhilo, session-perm replace koreche" >&2
+    export OPENCODE_CONFIG="$SESSION_FILE"
+    echo "zyvo: SESSION-ALLOW ON — ei session e ar kono permission prompt ashbe na." >&2
+    echo "zyvo: exit korle auto safe-mode (ask) e fire jabe." >&2
 fi
 
 # Locate the real binary. Prefer the package layout first so upgrades do not
 # accidentally execute a stale flat-layout binary left in $PREFIX/bin.
 for candidate in \
     "$dir/../libexec/opencode/opencode.bin" \
+    "$HOME/.local/libexec/zyvo/opencode.bin" \
     "${PREFIX:-/data/data/com.termux/files/usr}/libexec/opencode/opencode.bin" \
-    "$dir/opencode.bin"
+    "$dir/opencode.bin" \
+    "$HOME/.opencode/bin/opencode"
 do
     if [ -x "$candidate" ]; then
         exec "$candidate" "$@"

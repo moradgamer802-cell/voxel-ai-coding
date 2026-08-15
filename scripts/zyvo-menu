@@ -16,7 +16,10 @@ find_zyvo() {
     for c in \
         "$PREFIX/bin/zyvo" \
         "$PREFIX/libexec/opencode/zyvo.bin" \
-        "$PREFIX/libexec/opencode/opencode.bin"
+        "$PREFIX/libexec/opencode/opencode.bin" \
+        "$HOME/.local/bin/zyvo" \
+        "$HOME/.local/libexec/zyvo/opencode.bin" \
+        "$HOME/.opencode/bin/opencode"
     do
         [ -x "$c" ] && { echo "$c"; return 0; }
     done

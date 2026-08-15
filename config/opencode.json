@@ -16,6 +16,7 @@
   "default_agent": "build",
   "permission": {
     "bash": "ask",
-    "edit": "ask"
+    "edit": "ask",
+    "webfetch": "ask"
   }
 }
