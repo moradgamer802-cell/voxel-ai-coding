@@ -322,6 +322,15 @@ if [ "$ENV_KIND" = "termux" ]; then
     else
         warn "SHA256SUMS pawa jayni — integrity check skip"
     fi
+
+    # version compare — android build vs latest opencode (info only, non-fatal)
+    BUILD_VER="$(basename "$ZIP_URL" | grep -oE '[0-9]+(\.[0-9]+)+' | head -n1)"
+    OC_LATEST="$(curl -fsSL --connect-timeout 5 --max-time 20 \
+        "https://api.github.com/repositories/975734319/releases?per_page=1" 2>/dev/null \
+        | grep -m1 '"tag_name"' | sed 's/[^0-9.]*//g' || true)"
+    if [ -n "$BUILD_VER" ] && [ -n "$OC_LATEST" ] && [ "$BUILD_VER" != "$OC_LATEST" ]; then
+        info "android build: $BUILD_VER · opencode latest: $OC_LATEST — guysoft notun build release korle ei installer abar chalatei auto notun hoye jabe"
+    fi
 else
     # glibc linux / macOS: opencode.ai official installer
     # (linux-x64, linux-arm64, darwin-arm64, darwin-x64 — glibc + musl)

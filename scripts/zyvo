@@ -142,8 +142,16 @@ elif [ -n "$PREFIX" ] && [ -d "$PREFIX" ]; then
     echo "zyvo: warning: native library directory not found, may crash on Android 11+" >&2
 fi
 
-# ---- SESSION-ALLOW: apply BEFORE exec so this process only sees it ----
-if [ "$YOLO" = 1 ]; then
+# ---- auto-allow setup (YOLO) ----
+# Native path: binary te OpenCode er nijer `--auto` flag thakle SETAI use
+# kori (opencode 1.18+ e ache — deny rules respect kore, best). Purono
+# android build (1.17.9) e flag nai — tokhon temp-config fallback.
+# Detection ekbar kore stamp e cache hoy (binary change hole abar check).
+apply_auto_allow() {
+    if [ "$NATIVE_AUTO" = 1 ]; then
+        echo "zyvo: auto-allow ON (native --auto) — kono permission prompt ashbe na (safe: zyvo --safe)" >&2
+        return 0
+    fi
     SESSION_FILE="$TMPDIR/zyvo-session-perm.json"
     cat > "$SESSION_FILE" <<'EOF'
 {
@@ -159,8 +167,8 @@ if [ "$YOLO" = 1 ]; then
 EOF
     [ -n "$OPENCODE_CONFIG" ] && echo "zyvo: note: OPENCODE_CONFIG chhilo, session-perm replace koreche" >&2
     export OPENCODE_CONFIG="$SESSION_FILE"
-    echo "zyvo: auto-allow ON — ei session e kono permission prompt ashbe na (safe: zyvo --safe)" >&2
-fi
+    echo "zyvo: auto-allow ON — kono permission prompt ashbe na (safe: zyvo --safe)" >&2
+}
 
 # ---- in-chat session mode (/auto) auto-restore ----
 # /auto ba /approve config e allow lekhhe (state+backup file so rakhhe).
@@ -219,8 +227,28 @@ do
 done
 [ -n "$BIN" ] || { echo "zyvo: error: could not find opencode.bin" >&2; exit 127; }
 
+# native --auto detection (stamp cache — binary bodlale abar check hoy)
+NATIVE_AUTO=""
+AUTO_STAMP="$TMPDIR/zyvo-native-auto"
+BIN_KEY="$(ls -ln "$BIN" 2>/dev/null | awk '{print $5, $6, $7, $8}')"
+if [ -f "$AUTO_STAMP" ]; then
+    case "$(cat "$AUTO_STAMP" 2>/dev/null)" in
+        "$BIN_KEY yes") NATIVE_AUTO=1;;
+        "$BIN_KEY no")  NATIVE_AUTO=0;;
+    esac
+fi
+if [ -z "$NATIVE_AUTO" ]; then
+    if "$BIN" --help 2>&1 | grep -q -- '--auto'; then NATIVE_AUTO=1; else NATIVE_AUTO=0; fi
+    echo "$BIN_KEY $NATIVE_AUTO" > "$AUTO_STAMP" 2>/dev/null || true
+fi
+
 if [ "$YOLO" = 1 ]; then
-    # pure env mode — kichhu restore korte hobe na (temp file only)
+    apply_auto_allow
+    # native hole --auto flag diye exec; na hole OPENCODE_CONFIG (upore seta)
+    if [ "$NATIVE_AUTO" = 1 ]; then
+        if [ "$SESSION_MODE" = 1 ]; then exec "$BIN" --auto --continue "$@"; fi
+        exec "$BIN" --auto "$@"
+    fi
     if [ "$SESSION_MODE" = 1 ]; then exec "$BIN" --continue "$@"; fi
     exec "$BIN" "$@"
 fi
