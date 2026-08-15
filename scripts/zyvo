@@ -28,34 +28,81 @@ export TMP="$TMPDIR"
 export OPENCODE_DISABLE_TUI_AUDIO="${OPENCODE_DISABLE_TUI_AUDIO:-1}"
 mkdir -p "$TMPDIR" 2>/dev/null || true
 
-# ---- permission mode flag (first argument only) ----
-# zyvo --yolo / -y / --session-allow : Always Allow (session) — ei session e
-#   ar kono dhoroner permission prompt ashbe na; exit korle auto safe-mode.
-# zyvo --safe / --ask : normal ask-mode (default) — explicit override.
+# ---- permission mode flags + named session ----
+# zyvo --yolo / -y        : Always Allow (session) — ei session e ar kono
+#                           dhoroner permission prompt ashbe na; exit e auto safe.
+# zyvo --safe / --ask     : normal ask-mode (default) — explicit override.
+# zyvo session            : session list dekhao
+# zyvo session <naam>     : oi naamer session khulo/notun banao — folder
+#                           soho <base>/zyvo/<naam>/ er modde, chat history
+#                           auto-resume (--continue). Flags age pore jekono
+#                           order e: zyvo -y session 1 kaj kore.
 YOLO=0
-case "${1:-}" in
-    --yolo|-y|--session-allow|--session) YOLO=1; shift;;
-    --safe|--ask) shift;;
-esac
+SESSION_MODE=0
+SESSION_NAME=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --yolo|-y) YOLO=1; shift; continue;;
+        --safe|--ask) shift; continue;;
+        session|sessions)
+            SESSION_MODE=1; shift
+            [ "$#" -gt 0 ] && { SESSION_NAME="$1"; shift; }
+            break;;
+        *) break;;
+    esac
+done
 
-# Default workspace: when launched without a directory argument from the
-# plain home, boot into a DEDICATED folder on shared storage (/storage/
-# emulated/0/zyvo) — na hoy storage-root. Storage-root e hajar hajar file
-# (DCIM, WhatsApp, Android/) thake; oi ghor abar khalashi korle phone lag
-# kore ar gorom hoy. Notun folder = halka + fast. Specific folder e kaj
-# chaile: zyvo /storage/emulated/0/Documents
-if [ "$#" -eq 0 ] && [ "$PWD" = "$HOME" ]; then
-    BASE=""
-    if [ -d /storage/emulated/0 ]; then BASE=/storage/emulated/0
-    elif [ -d /sdcard ]; then BASE=/sdcard
+# ---- workspace resolve ----
+# Shared storage base (na thakle home) er upor default workspace + named
+# sessions thake. Storage-root e hajar hajar file (DCIM, WhatsApp, Android/)
+# thake — oi ghor abar khalashi korle phone lag kore ar gorom hoy.
+# Notun dedicated folder = halka + fast.
+WS_BASE=""
+if [ -d /storage/emulated/0 ]; then WS_BASE=/storage/emulated/0
+elif [ -d /sdcard ]; then WS_BASE=/sdcard
+fi
+if [ "$SESSION_MODE" = 1 ]; then
+    # named session = folder soho zyvo/ folder er vitore:
+    #   /storage/emulated/0/zyvo/<naam>/
+    SDIR_ROOT="${WS_BASE:-$HOME}/zyvo"
+    if [ -z "$SESSION_NAME" ]; then
+        SESS_TMP="$TMPDIR/zyvo-session-list"
+        : > "$SESS_TMP" 2>/dev/null || true
+        if [ -d "$SDIR_ROOT" ]; then
+            ls -1t "$SDIR_ROOT" 2>/dev/null | while read -r d; do
+                [ -n "$d" ] && [ -d "$SDIR_ROOT/$d" ] && printf '%s\n' "$d" >> "$SESS_TMP"
+            done
+        fi
+        echo "ZYVO sessions ($SDIR_ROOT):"
+        if [ -s "$SESS_TMP" ]; then sed 's/^/  /' "$SESS_TMP"
+        else echo "  (khali — notun banate: zyvo session <naam>)"; fi
+        rm -f "$SESS_TMP" 2>/dev/null || true
+        echo "Open/new: zyvo session <naam>"
+        exit 0
     fi
-    if [ -n "$BASE" ]; then
-        if mkdir -p "$BASE/zyvo" 2>/dev/null && [ -d "$BASE/zyvo" ]; then
-            cd "$BASE/zyvo"
-            export OPENCODE_DEFAULT_DIR="$BASE/zyvo"
+    case "$SESSION_NAME" in
+        ""|"."|".."|*[!A-Za-z0-9._-]*)
+            echo "zyvo: session name e sudhu a-z 0-9 . _ - jabe (space/symbol nai)" >&2
+            exit 1;;
+    esac
+    SDIR="$SDIR_ROOT/$SESSION_NAME"
+    if mkdir -p "$SDIR" 2>/dev/null && [ -d "$SDIR" ]; then
+        cd "$SDIR"
+        export OPENCODE_DEFAULT_DIR="$SDIR"
+    else
+        echo "zyvo: session folder banate parlam na ($SDIR)" >&2
+        exit 1
+    fi
+elif [ "$#" -eq 0 ] && [ "$PWD" = "$HOME" ]; then
+    # Default workspace: dedicated folder (na hoy storage-root), sirf
+    # directory argument chara home theke chalale.
+    if [ -n "$WS_BASE" ]; then
+        if mkdir -p "$WS_BASE/zyvo" 2>/dev/null && [ -d "$WS_BASE/zyvo" ]; then
+            cd "$WS_BASE/zyvo"
+            export OPENCODE_DEFAULT_DIR="$WS_BASE/zyvo"
         else
-            cd "$BASE"
-            export OPENCODE_DEFAULT_DIR="$BASE"
+            cd "$WS_BASE"
+            export OPENCODE_DEFAULT_DIR="$WS_BASE"
         fi
     fi
 fi
@@ -175,6 +222,7 @@ done
 
 if [ "$YOLO" = 1 ]; then
     # pure env mode — kichhu restore korte hobe na (temp file only)
+    if [ "$SESSION_MODE" = 1 ]; then exec "$BIN" --continue "$@"; fi
     exec "$BIN" "$@"
 fi
 
@@ -183,6 +231,10 @@ fi
 #  concurrent onno session er state accident-e restore na hoy tar jonno)
 export ZYVO_PID="$$"
 rc=0
-"$BIN" "$@" || rc=$?
+if [ "$SESSION_MODE" = 1 ]; then
+    "$BIN" --continue "$@" || rc=$?
+else
+    "$BIN" "$@" || rc=$?
+fi
 session_cleanup
 exit $rc

@@ -56,8 +56,24 @@ oc-settings perm     # interactive menu (ask / always / deny / session)
 ```bash
 zyvo                 # AI start — ekhuni kaj korte parbe (ask-mode, safe)
 zyvo --yolo          # session mode — permission prompt chhara
+zyvo session         # session list
+zyvo session proj1   # notun/resume session "proj1" — zyvo/proj1/ folder e
 oc-settings          # model tier + permission menu
 ```
+
+### Sessions (alada alada kaj)
+
+Prottek session er nijer folder + nijer chat history:
+
+```
+/storage/emulated/0/zyvo/
+├── seson1/     ← zyvo session seson1  (file + kotha ekhanei jome)
+└── seson2/     ← zyvo session seson2
+```
+
+`zyvo session seson1` dile sei session er kotha-motto abar shuru —
+age ki bolse chilo AI mone rakhbe (`--continue`). Naam e sudhu
+`a-z 0-9 . _ -` jabe.
 
 | Command | Kaj |
 |---------|-----|
