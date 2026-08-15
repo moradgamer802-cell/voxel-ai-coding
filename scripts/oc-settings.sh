@@ -8,13 +8,17 @@
 #   oc-settings perm ask        (sob ask — safe default)
 #   oc-settings perm allow      (Always Allow — bash/edit/webfetch persistent allow)
 #   oc-settings perm deny       (bash deny — AI command chalate parbe na, read-only)
-#   oc-settings auto on         (same as perm allow)
-#   oc-settings auto off|safe   (same as perm ask)
-#   oc-settings session         (session-allow info: zyvo --yolo)
+#   oc-settings auto on         (session mode ON — /auto command er kaj)
+#   oc-settings auto off        (safe: session off + ask mode)
+#   oc-settings session on      (in-chat session mode ON — /auto er kaj)
+#   oc-settings session off     (restore — purano permission mode e fire)
+#   oc-settings safe            (session off + ask mode — full safe)
 #   oc-settings apply           (config abar likhe, restart required)
 set -e
 
 CONFIG_DIR="${HOME}/.config/opencode"
+STATE_FILE="$CONFIG_DIR/zyvo-session-state.json"
+BAK_FILE="$CONFIG_DIR/opencode.json.zyvo-session-bak"
 AGENT="build"
 USERNAME="deshi-dev"
 
@@ -80,21 +84,101 @@ current_perm() {
         sed -n 's/.*"bash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$CONFIG_DIR/opencode.json" | head -n1
 }
 
+perm_read() { # $1=key (bash|edit|webfetch)
+    [ -f "$CONFIG_DIR/opencode.json" ] && \
+        sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$CONFIG_DIR/opencode.json" | head -n1
+}
+
+session_active() {
+    echo "${OPENCODE_CONFIG:-}" | grep -q "zyvo-session-perm.json" && return 0
+    [ -f "$STATE_FILE" ] && return 0
+    return 1
+}
+
+session_on() {
+    if echo "${OPENCODE_CONFIG:-}" | grep -q "zyvo-session-perm.json"; then
+        echo "ALREADY ON (yolo mode)"
+        return 0
+    fi
+    if [ -f "$STATE_FILE" ]; then
+        echo "ALREADY ON"
+        return 0
+    fi
+    command -v python3 >/dev/null 2>&1 || { echo "ERROR: python3 lagbe (pkg install python3)"; return 1; }
+    local pb pe pw
+    pb="$(perm_read bash)"; [ -z "$pb" ] && pb=ask
+    pe="$(perm_read edit)"; [ -z "$pe" ] && pe=ask
+    pw="$(perm_read webfetch)"; [ -z "$pw" ] && pw=ask
+    mkdir -p "$CONFIG_DIR"
+    printf '{\n  "bash": "%s",\n  "edit": "%s",\n  "webfetch": "%s",\n  "pid": %s\n}\n' \
+        "$pb" "$pe" "$pw" "${ZYVO_PID:-0}" > "$STATE_FILE"
+    [ -f "$CONFIG_DIR/opencode.json" ] && cp "$CONFIG_DIR/opencode.json" "$BAK_FILE"
+    apply_perms allow allow allow "" ""
+    echo "SESSION ON"
+    echo "HINT: jodi prompt ekhono ashe — zyvo ekbar restart (config save kora ache, restart er por prompt ashbe na)"
+}
+
+session_restore() {
+    if [ ! -f "$STATE_FILE" ] && [ ! -f "$BAK_FILE" ]; then
+        echo "OFF (session mode chalu chilo na)"
+        return 0
+    fi
+    if [ -f "$STATE_FILE" ] && command -v python3 >/dev/null 2>&1; then
+        python3 - "$CONFIG_DIR" "$STATE_FILE" <<'PY'
+import json, os, sys
+d, state = sys.argv[1], sys.argv[2]
+try:
+    vals = json.load(open(state))
+except Exception:
+    vals = {}
+targets = [os.path.join(d, "opencode.json")]
+jsonc = os.path.join(d, "opencode.jsonc")
+if os.path.exists(jsonc):
+    targets.append(jsonc)
+for cfgp in targets:
+    cfg = {}
+    try:
+        cfg = json.load(open(cfgp))
+    except Exception:
+        pass
+    perm = cfg.setdefault("permission", {})
+    for k in ("bash", "edit", "webfetch"):
+        if k in vals:
+            perm[k] = vals[k]
+    cfg["permission"] = perm
+    with open(cfgp, "w") as fh:
+        json.dump(cfg, fh, indent=2)
+        fh.write("\n")
+PY
+        rm -f "$STATE_FILE" "$BAK_FILE"
+        echo "RESTORED"
+    elif [ -f "$BAK_FILE" ]; then
+        mv "$BAK_FILE" "$CONFIG_DIR/opencode.json"
+        rm -f "$STATE_FILE"
+        echo "RESTORED (backup theke)"
+    else
+        rm -f "$STATE_FILE" "$BAK_FILE"
+        apply_perms ask ask ask "" "" >/dev/null
+        echo "RESTORED (default ask)"
+    fi
+}
+
 session_info() {
     echo
     echo "  SESSION MODE — Always Allow (ei session only)"
     echo "  ─────────────────────────────────────────────"
     if echo "${OPENCODE_CONFIG:-}" | grep -q "zyvo-session-perm.json"; then
-        echo "  Status: ACTIVE — ei session e ar kono permission prompt ashbe na."
+        echo "  Status: ON (yolo mode — zyvo --yolo diye chalu)"
         echo "  Exit korle auto safe-mode (ask) e fire jabe."
+    elif [ -f "$STATE_FILE" ]; then
+        echo "  Status: ON (/auto ba /approve diye chalu)"
+        echo "  Zyvo exit korle auto safe-mode e restore hobe."
     else
         echo "  Status: off"
         echo
-        echo "  Chalate:  zyvo --yolo        (ba: zyvo -y)"
-        echo "  Tahole ei session e AI kono dhoroner permission chaibe na —"
-        echo "  bash/edit/webfetch sob allow. Zyvo exit korle abar safe ask-mode."
-        echo
-        echo "  Persistent (sob session e) Always-Allow chaile: oc-settings perm allow"
+        echo "  On korte (in-chat):  /auto   (ba /approve)"
+        echo "  Start thekei:         zyvo --yolo"
+        echo "  Persistent allow:     oc-settings perm allow"
     fi
 }
 
@@ -211,17 +295,29 @@ case "${1:-}" in
     perm|permission)
         if [ -n "${2:-}" ]; then perm_apply "$2"; else perm_menu; fi
         ;;
-    session) session_info ;;
+    session)
+        case "${2:-}" in
+            on) session_on ;;
+            off|restore) session_restore ;;
+            status) session_info ;;
+            *) session_info ;;
+        esac
+        ;;
+    safe)
+        session_restore >/dev/null 2>&1 || true
+        perm_apply ask
+        echo "  (session mode + always-allow duitai off — sob prompt abar ashbe)"
+        ;;
     auto)
         case "${2:-on}" in
-            on|1|allow)
-                perm_apply allow
-                echo "  In-chat: /approve · Band: oc-settings auto off"
+            on|1|allow|session)
+                session_on
                 ;;
             off|0|no|ask|safe)
+                session_restore >/dev/null 2>&1 || true
                 perm_apply ask
                 ;;
-            *) echo "Usage: oc-settings auto on|off|safe"; exit 1;;
+            *) echo "Usage: oc-settings auto on|off"; exit 1;;
         esac
         ;;
     apply)

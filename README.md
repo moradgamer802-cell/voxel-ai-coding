@@ -30,15 +30,16 @@ Jokhon AI kono kaj kore (command/file edit/web), permission ashe:
 | Option | Kaj |
 |--------|-----|
 | **Allow** | Ekbar allow — TUI prompt e chapo |
-| **Always Allow** | bash/edit/webfetch sob **persistent** allow: `oc-settings perm allow` (ba `/approve`) |
+| **Always Allow** | bash/edit/webfetch sob **persistent** allow: `oc-settings perm allow` |
 | **Deny** | Ekbar reject — TUI prompt e; bash **sob deny** (readonly): `oc-settings perm deny` |
-| **Always Allow (session)** | `zyvo --yolo` diye start — **ei session e ar KONO permission prompt ashbe na**, exit korle auto safe-mode |
+| **Always Allow (session)** | In-chat **`/auto`** (ba `/approve`) — **ei session e ar KONO permission prompt ashbe na**; zyvo band korle auto safe-mode. Start theke chaile: `zyvo --yolo` |
 
 ```bash
-zyvo --yolo          # session mode: kono prompt nai, exit e auto safe
+/auto                # in-chat: session mode ON — ekhuni ar prompt nai
+zyvo --yolo          # session mode from start (temp config, zero-trace)
 zyvo -y              # short version
 oc-settings perm     # interactive menu (ask / always / deny / session)
-/perm  /session  /approve  /safe   # in-chat commands
+/perm  /session  /safe   # in-chat commands
 ```
 
 ## Overview

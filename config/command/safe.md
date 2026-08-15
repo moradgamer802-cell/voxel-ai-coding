@@ -1,11 +1,10 @@
 ---
-description: "SAFE mode — permission abar ask (prompt ashbe), auto-approve off."
+description: "SAFE mode — session mode off + abar sob permission prompt ashbe."
 agent: build
 ---
 
-Auto-approve OFF / safe mode e firete hobe. $ARGUMENTS
+SAFE MODE e firete hobe. $ARGUMENTS
 
-1. `oc-settings perm ask` chalai koro (ba `oc-settings auto off`).
-2. Check koro config e "permission" abar "ask" hoyeche (bash/edit/webfetch).
-3. User ke bolo: zyvo restart korle sob permission prompt abar ashbe (secure mode).
-4. Jodi user session-allow (`zyvo --yolo`) e chilo: bolo zyvo exit korleo auto safe-mode e fire jabe — kichhu kora lagbe na.
+1. `oc-settings safe` chalale koro — ar kichhu na.
+2. Ek line e bolo: "✓ Safe mode ON — abar permission prompt ashbe."
+3. Onno kono kotha bolo na — ek-i line e sesh.

@@ -1,12 +1,14 @@
 ---
-description: Auto-approve ON — bash/edit/webfetch prompt chhara, like other CLIs.
+description: "Session mode ON — ei session e ar kono permission prompt ashbe na."
 agent: build
 ---
 
-Auto-approve permission ON koro. $ARGUMENTS
+SESSION MODE ON korte hobe. $ARGUMENTS
 
-1. `oc-settings auto on` chalai koro (bash/edit/webfetch = allow hoye jabe config e).
-2. Config check: `grep -A3 '"permission"' ~/.config/opencode/opencode.json` e "allow" ase nai dekho.
-3. Check hoye gele only "done ✓" likho — prompt ar ashbe na (zyvo restart er por theke).
-4. Sudhu ekta session er jonno chaile user ke bolo: `zyvo --yolo` diye start koro (`/session`) — auto-off hoy exit e.
-5. Warning: auto-approve ON thakle AI joto kichhu chaibe chalaite parbe — sensitive command e satark thako. Band: /safe.
+1. `oc-settings session on` chalale koro — ar kichhu na.
+2. Output e jodi "SESSION ON" thake → user ke EXACTLY ei ek line bolo:
+   "✓ Session mode ON — ar kono permission prompt ashbe na. Zyvo band korle auto safe-mode."
+3. Output e "ALREADY ON" thake → bolo: "Session mode already ON ✓"
+4. Output e "HINT:" line thake → sei line ta o ek line e user ke dekhao.
+5. Output e "ERROR" thake → `oc-settings session on` abar chalao; tale error ta dekhao.
+6. Onno KONO kotha bolo na — no explanation, no warning, no lecture. Ek-i line e sesh.

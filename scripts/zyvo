@@ -108,8 +108,49 @@ EOF
     echo "zyvo: exit korle auto safe-mode (ask) e fire jabe." >&2
 fi
 
+# ---- in-chat session mode (/auto) auto-restore ----
+# /auto ba /approve config e allow lekhhe (state+backup file so rakhhe).
+# Ei wrapper holo parent process — tai zyvo exit korle ekhane restore kori.
+# Crashed session er stale state thakle START e-i clean kori.
+CFG_DIR="${HOME}/.config/opencode"
+OC_STATE="$CFG_DIR/zyvo-session-state.json"
+OC_BAK="$CFG_DIR/opencode.json.zyvo-session-bak"
+OC_SETTINGS=""
+for c in "$dir/oc-settings" \
+    "${PREFIX:-/data/data/com.termux/files/usr}/bin/oc-settings" \
+    "$HOME/.local/bin/oc-settings"
+do
+    if [ -x "$c" ]; then OC_SETTINGS="$c"; break; fi
+done
+
+session_cleanup() {
+    [ -f "$OC_STATE" ] || [ -f "$OC_BAK" ] || return 0
+    # onno LIVE zyvo session er state? take hug na — pid diye check.
+    # (state e pid 0/manual thakle ba pid dead thakle restore koro)
+    if [ -f "$OC_STATE" ]; then
+        SPID="$(sed -n 's/.*"pid"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$OC_STATE" 2>/dev/null || true)"
+        if [ -n "$SPID" ] && [ "$SPID" != "0" ] && [ "$SPID" != "$$" ] && kill -0 "$SPID" 2>/dev/null; then
+            return 0
+        fi
+    fi
+    if [ -n "$OC_SETTINGS" ]; then
+        "$OC_SETTINGS" session restore >/dev/null 2>&1 || {
+            [ -f "$OC_BAK" ] && mv "$OC_BAK" "$CFG_DIR/opencode.json" 2>/dev/null || true
+            rm -f "$OC_STATE" 2>/dev/null || true
+        }
+    elif [ -f "$OC_BAK" ]; then
+        mv "$OC_BAK" "$CFG_DIR/opencode.json" 2>/dev/null || true
+        rm -f "$OC_STATE" 2>/dev/null || true
+    fi
+}
+
+# stale state from a killed/crashed session? restore before launch
+# (state er pid ekhono live? tahole onno zyvo session cholche — baad)
+[ "$YOLO" = 0 ] && session_cleanup
+
 # Locate the real binary. Prefer the package layout first so upgrades do not
 # accidentally execute a stale flat-layout binary left in $PREFIX/bin.
+BIN=""
 for candidate in \
     "$dir/../libexec/opencode/opencode.bin" \
     "$HOME/.local/libexec/zyvo/opencode.bin" \
@@ -118,9 +159,22 @@ for candidate in \
     "$HOME/.opencode/bin/opencode"
 do
     if [ -x "$candidate" ]; then
-        exec "$candidate" "$@"
+        BIN="$candidate"
+        break
     fi
 done
+[ -n "$BIN" ] || { echo "zyvo: error: could not find opencode.bin" >&2; exit 127; }
 
-echo "zyvo: error: could not find opencode.bin" >&2
-exit 127
+if [ "$YOLO" = 1 ]; then
+    # pure env mode — kichhu restore korte hobe na (temp file only)
+    exec "$BIN" "$@"
+fi
+
+# normal mode: child chole, exit e in-chat session state auto-restore
+# (ZYVO_PID die oc-settings state file e ei wrapper er pid rekhe dey —
+#  concurrent onno session er state accident-e restore na hoy tar jonno)
+export ZYVO_PID="$$"
+rc=0
+"$BIN" "$@" || rc=$?
+session_cleanup
+exit $rc
