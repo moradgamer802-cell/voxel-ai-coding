@@ -46,7 +46,7 @@ oc-settings perm     # interactive menu (ask / always / deny / session)
 
 | Item | Detail |
 |------|--------|
-| Command | **`zyvo`** — AI chole, default workdir `/storage/emulated/0` (document/downloads e direkt kaj) |
+| Command | **`zyvo`** — AI chole, default workspace `/storage/emulated/0/zyvo` (dedicated folder — fast, phone halka thake). Onno folder e: `zyvo /storage/emulated/0/Documents` |
 | AI Provider | **OpenCode Zen — zero config** (key age thekei built-in, kichu jamate hobe na) |
 | Language | **Banglish** e kotha bole (default agent `build`) |
 | Commands | `/dekho`, `/review`, `/fix`, `/model`, `/perm`, `/session`, `/approve`, `/safe`, `/zyvo` + 9 skills |
@@ -63,8 +63,8 @@ oc-settings          # model tier + permission menu
 |---------|-----|
 | `oc-settings model` | Model tier: `max` (default) / `mid` / `ultra` / `tiny` |
 | `oc-settings perm` | Permission menu: ask / always allow / deny / session |
-| `oc-settings auto on` | Always-allow ON (persistent) |
-| `oc-settings auto off` | Ask-mode (safe) |
+| `oc-settings auto on` | Session mode ON (ei session e prompt nai) |
+| `oc-settings auto off` | Safe mode (session off + ask) |
 | `oc-settings models` | Zen free model list |
 
 > Model/permission change er por **zyvo restart** koro (`--yolo` session baade — o to temp config).
@@ -74,6 +74,22 @@ oc-settings          # model tier + permission menu
 Same install command abar chalao — sob auto-update hoy.
 **User settings preserve hoy**: model choice, permission mode, provider key —
 update e config merge hoy, overwrite na.
+
+## Performance (phone lag / gorom hole)
+
+Phone gorom + lag er main karon chilo storage-root (`/storage/emulated/0`) e
+kaj kora — hajar hajar file (DCIM, WhatsApp, Android/) scan + snapshot
+tracking e CPU oghan hoy. Ekhon:
+
+- **Dedicated workspace** — default `/storage/emulated/0/zyvo` (auto-create).
+  AI ekhane kaj kore, puro storage tala-peete hoy na
+- **Snapshot off** (`snapshot: false`) — storage-root e alada git repo chalano
+  band. Undo lagle on korte paro config e
+- **Watcher ignore** — DCIM/Pictures/WhatsApp/Android... watch kora hoy na
+- **Autoupdate off + share disabled** — background network/CPU kaj nai
+
+Extra tips: `Ctrl+K` chaple TUI animation band (battery boro boro bache),
+specific folder e kaj: `zyvo /storage/emulated/0/Documents`.
 
 ## Troubleshooting
 

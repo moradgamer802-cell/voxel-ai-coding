@@ -490,6 +490,11 @@ except Exception:
 for k in ("username", "model", "small_model", "default_agent"):
     if k not in base and k in new:
         base[k] = new[k]
+# performance keys (phone lag/heat fix) — user set thakle touch hoy na
+base.setdefault("snapshot", False)
+base.setdefault("autoupdate", False)
+base.setdefault("share", "disabled")
+base.setdefault("watcher", new.get("watcher", {}))
 providers = base.setdefault("provider", {})
 for pk, pv in new.get("provider", {}).items():
     providers.setdefault(pk, pv)

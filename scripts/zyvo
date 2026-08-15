@@ -39,16 +39,24 @@ case "${1:-}" in
 esac
 
 # Default workspace: when launched without a directory argument from the
-# plain home, boot inside Android shared storage so the AI searches the
-# user's real files — documents, downloads, etc.
-# (/sdcard alias covers proot distros where /storage/emulated/0 may differ.)
+# plain home, boot into a DEDICATED folder on shared storage (/storage/
+# emulated/0/zyvo) — na hoy storage-root. Storage-root e hajar hajar file
+# (DCIM, WhatsApp, Android/) thake; oi ghor abar khalashi korle phone lag
+# kore ar gorom hoy. Notun folder = halka + fast. Specific folder e kaj
+# chaile: zyvo /storage/emulated/0/Documents
 if [ "$#" -eq 0 ] && [ "$PWD" = "$HOME" ]; then
-    if [ -d /storage/emulated/0 ]; then
-        cd /storage/emulated/0
-        export OPENCODE_DEFAULT_DIR=/storage/emulated/0
-    elif [ -d /sdcard ]; then
-        cd /sdcard
-        export OPENCODE_DEFAULT_DIR=/sdcard
+    BASE=""
+    if [ -d /storage/emulated/0 ]; then BASE=/storage/emulated/0
+    elif [ -d /sdcard ]; then BASE=/sdcard
+    fi
+    if [ -n "$BASE" ]; then
+        if mkdir -p "$BASE/zyvo" 2>/dev/null && [ -d "$BASE/zyvo" ]; then
+            cd "$BASE/zyvo"
+            export OPENCODE_DEFAULT_DIR="$BASE/zyvo"
+        else
+            cd "$BASE"
+            export OPENCODE_DEFAULT_DIR="$BASE"
+        fi
     fi
 fi
 
