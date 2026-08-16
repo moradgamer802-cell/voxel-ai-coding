@@ -11,7 +11,7 @@
       }
     }
   },
-  "model": "zyvo/nemotron-3-ultra-free",
+  "model": "zyvo/deepseek-v4-flash-free",
   "small_model": "zyvo/laguna-s-2.1-free",
   "default_agent": "build",
   "snapshot": false,

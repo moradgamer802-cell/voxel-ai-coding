@@ -27,8 +27,8 @@ curl -fsSL https://raw.githubusercontent.com/moradgamer802-cell/zyvo-ai-coding/m
 
 AI tar **puro shokti** diye kaj kore:
 
-- **Ultra model default** — free tier er sobcheye shoktishali (nemotron-3-ultra).
-  Fast chail: `oc-settings model fast`
+- **DeepSeek model default** (deepseek-v4-flash) — stable + fast. Onno tier:
+  `oc-settings model lightning|mid` (nemotron-ultra te kichu somoy provider error ashe — experimental)
 - **Full-power agent** — AI ke bala geche: age bujho → plan → step-by-step
   execute → nije verify → PURO kaj sesh na howa porjonto thaimo na.
   Placeholder/TODO delivered kore na, web search kore current info anta pare
@@ -45,7 +45,7 @@ file edit, web kaj chalay (beginner-friendly design).
 |------|--------|
 | Command | **`zyvo`** — AI chole, default workspace `/storage/emulated/0/zyvo` (dedicated folder — fast, phone halka thake). Onno folder e: `zyvo /storage/emulated/0/Documents` |
 | AI Provider | **OpenCode Zen — zero config** (key age thekei built-in, kichu jamate hobe na) |
-| Model | **Ultra full-power** (nemotron-3-ultra-free) default — fast/lightning tier o ache |
+| Model | **DeepSeek full-power** (deepseek-v4-flash-free) default — stable; lightning/mid tier o ache |
 | Language | **Banglish** e kotha bole (custom full-power agent) |
 | Commands | `/dekho`, `/review`, `/fix`, `/model`, `/zyvo` + 13 skills |
 
@@ -75,7 +75,7 @@ age ki bolse chilo AI mone rakhbe (`--continue`). Naam e sudhu
 
 | Command | Kaj |
 |---------|-----|
-| `oc-settings model` | Model tier: `ultra` (full-power, default) / `fast` / `lightning` / `mid` |
+| `oc-settings model` | Model tier: `max` (default) / `lightning` / `mid` / `ultra` (experimental) |
 | `oc-settings models` | Zen free model list |
 
 > Model change er por **zyvo restart** koro.

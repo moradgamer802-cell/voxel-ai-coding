@@ -515,8 +515,8 @@ for k in ("username", "model", "small_model", "default_agent"):
 # dead-model auto-fix: free list theke ling-3.0 sora feleche
 if "ling-3.0" in base.get("small_model", ""):
     base["small_model"] = new.get("small_model", "zyvo/laguna-s-2.1-free")
-# purono default (flash) → notun full-power default (ultra); custom choice untouched
-if base.get("model", "").endswith("deepseek-v4-flash-free") and "model" in new:
+# nemotron-3-ultra provider error dey — deepseek (stable default) e fire
+if base.get("model", "").endswith("nemotron-3-ultra-free") and "model" in new:
     base["model"] = new["model"]
 base.setdefault("snapshot", False)
 base.setdefault("autoupdate", False)

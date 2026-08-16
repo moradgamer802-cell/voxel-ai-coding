@@ -19,7 +19,7 @@ if [ -f "$CONFIG_DIR/opencode.json" ]; then
     [ -n "$CUR" ] && MODEL_PREFIX="$CUR"
 fi
 
-MODEL="${MODEL_PREFIX}/nemotron-3-ultra-free"
+MODEL="${MODEL_PREFIX}/deepseek-v4-flash-free"
 SMALL="${MODEL_PREFIX}/laguna-s-2.1-free"
 
 saved_model() {
@@ -63,30 +63,31 @@ pick_model() {
     local prev="$1"
     local TIER_ARG="${2:-}"
     case "$TIER_ARG" in
-        ultra|strong|default) MODEL="${MODEL_PREFIX}/nemotron-3-ultra-free"; SMALL="${MODEL_PREFIX}/laguna-s-2.1-free"; return;;
-        max|flash|fast) MODEL="${MODEL_PREFIX}/deepseek-v4-flash-free"; SMALL="${MODEL_PREFIX}/laguna-s-2.1-free"; return;;
-        lightning) MODEL="${MODEL_PREFIX}/nematron-3.5-lightning-free"; SMALL="${MODEL_PREFIX}/laguna-s-2.1-free"; return;;
+        max|flash|default|full) MODEL="${MODEL_PREFIX}/deepseek-v4-flash-free"; SMALL="${MODEL_PREFIX}/laguna-s-2.1-free"; return;;
+        lightning) MODEL="${MODEL_PREFIX}/nemotron-3.5-lightning-free"; SMALL="${MODEL_PREFIX}/laguna-s-2.1-free"; return;;
         mid|medium) MODEL="${MODEL_PREFIX}/mimo-v2.5-free"; SMALL="${MODEL_PREFIX}/laguna-s-2.1-free"; return;;
+        ultra|strong) MODEL="${MODEL_PREFIX}/nemotron-3-ultra-free"; SMALL="${MODEL_PREFIX}/laguna-s-2.1-free"; return;;
         *) ;;
     esac
     echo
     echo "  Model tier select koro:"
-    echo "  1) Ultra (default)   : ${MODEL_PREFIX}/nemotron-3-ultra-free  [full-power]"
-    echo "  2) Fast              : ${MODEL_PREFIX}/deepseek-v4-flash-free [spero, kom shokti]"
-    echo "  3) Lightning         : ${MODEL_PREFIX}/nemotron-3.5-lightning-free"
-    echo "  4) Mid               : ${MODEL_PREFIX}/mimo-v2.5-free"
-    echo "  5) Custom ID         (e.g. ${MODEL_PREFIX}/gpt-5.5)"
+    echo "  1) Max (default)  : ${MODEL_PREFIX}/deepseek-v4-flash-free [full-power, stable]"
+    echo "  2) Lightning      : ${MODEL_PREFIX}/nematron-3.5-lightning-free"
+    echo "  3) Mid            : ${MODEL_PREFIX}/mimo-v2.5-free"
+    echo "  4) Nemotron Ultra : ${MODEL_PREFIX}/nemotron-3-ultra-free [! provider error hoy — experimental]"
+    echo "  5) Custom ID      (e.g. ${MODEL_PREFIX}/gpt-5.5)"
     echo -n "  [1-5, Enter thakbe - $prev]: "
     read -r CHOICE || CHOICE=0
     case "$CHOICE" in
-        1) MODEL="${MODEL_PREFIX}/nemotron-3-ultra-free"
+        1) MODEL="${MODEL_PREFIX}/deepseek-v4-flash-free"
            SMALL="${MODEL_PREFIX}/laguna-s-2.1-free";;
-        2) MODEL="${MODEL_PREFIX}/deepseek-v4-flash-free"
+        2) MODEL="${MODEL_PREFIX}/nematron-3.5-lightning-free"
            SMALL="${MODEL_PREFIX}/laguna-s-2.1-free";;
-        3) MODEL="${MODEL_PREFIX}/nematron-3.5-lightning-free"
+        3) MODEL="${MODEL_PREFIX}/mimo-v2.5-free"
            SMALL="${MODEL_PREFIX}/laguna-s-2.1-free";;
-        4) MODEL="${MODEL_PREFIX}/mimo-v2.5-free"
-           SMALL="${MODEL_PREFIX}/laguna-s-2.1-free";;
+        4) MODEL="${MODEL_PREFIX}/nemotron-3-ultra-free"
+           SMALL="${MODEL_PREFIX}/laguna-s-2.1-free"
+           echo "  Warning: ei model e provider error report hoecche — kaj na korle oc-settings model max" ;;
         5) echo -n "  Model ID: "; read -r CUSTOM
            [ -n "$CUSTOM" ] && MODEL="$CUSTOM"
            echo -n "  Small Model ID (Enter thakbe): "; read -r CSMALL
