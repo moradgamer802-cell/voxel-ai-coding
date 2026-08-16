@@ -19,8 +19,8 @@ if [ -f "$CONFIG_DIR/opencode.json" ]; then
     [ -n "$CUR" ] && MODEL_PREFIX="$CUR"
 fi
 
-MODEL="${MODEL_PREFIX}/deepseek-v4-flash-free"
-SMALL="${MODEL_PREFIX}/ling-3.0-tiny-free"
+MODEL="${MODEL_PREFIX}/nemotron-3-ultra-free"
+SMALL="${MODEL_PREFIX}/laguna-s-2.1-free"
 
 saved_model() {
     [ -f "$CONFIG_DIR/opencode.json" ] && sed -n 's/.*"model"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$CONFIG_DIR/opencode.json" | head -n1
@@ -63,30 +63,30 @@ pick_model() {
     local prev="$1"
     local TIER_ARG="${2:-}"
     case "$TIER_ARG" in
-        max|default|flash) MODEL="${MODEL_PREFIX}/deepseek-v4-flash-free"; SMALL="${MODEL_PREFIX}/ling-3.0-tiny-free"; return;;
-        mid|medium) MODEL="${MODEL_PREFIX}/mimo-v2.5-free"; SMALL="${MODEL_PREFIX}/ling-3.0-tiny-free"; return;;
-        ultra|strong) MODEL="${MODEL_PREFIX}/nemotron-3-ultra-free"; SMALL="${MODEL_PREFIX}/ling-3.0-tiny-free"; return;;
-        tiny) MODEL="${MODEL_PREFIX}/ling-3.0-tiny-free"; SMALL="$MODEL"; return;;
+        ultra|strong|default) MODEL="${MODEL_PREFIX}/nemotron-3-ultra-free"; SMALL="${MODEL_PREFIX}/laguna-s-2.1-free"; return;;
+        max|flash|fast) MODEL="${MODEL_PREFIX}/deepseek-v4-flash-free"; SMALL="${MODEL_PREFIX}/laguna-s-2.1-free"; return;;
+        lightning) MODEL="${MODEL_PREFIX}/nematron-3.5-lightning-free"; SMALL="${MODEL_PREFIX}/laguna-s-2.1-free"; return;;
+        mid|medium) MODEL="${MODEL_PREFIX}/mimo-v2.5-free"; SMALL="${MODEL_PREFIX}/laguna-s-2.1-free"; return;;
         *) ;;
     esac
     echo
     echo "  Model tier select koro:"
-    echo "  1) Max (default)    : ${MODEL_PREFIX}/deepseek-v4-flash-free"
-    echo "  2) Mid (balanced)   : ${MODEL_PREFIX}/mimo-v2.5-free"
-    echo "  3) Ultra (strong)   : ${MODEL_PREFIX}/nemotron-3-ultra-free"
-    echo "  4) Tiny (smallest)  : ${MODEL_PREFIX}/ling-3.0-tiny-free"
-    echo "  5) Custom ID        (e.g. ${MODEL_PREFIX}/gpt-5.5)"
+    echo "  1) Ultra (default)   : ${MODEL_PREFIX}/nemotron-3-ultra-free  [full-power]"
+    echo "  2) Fast              : ${MODEL_PREFIX}/deepseek-v4-flash-free [spero, kom shokti]"
+    echo "  3) Lightning         : ${MODEL_PREFIX}/nemotron-3.5-lightning-free"
+    echo "  4) Mid               : ${MODEL_PREFIX}/mimo-v2.5-free"
+    echo "  5) Custom ID         (e.g. ${MODEL_PREFIX}/gpt-5.5)"
     echo -n "  [1-5, Enter thakbe - $prev]: "
     read -r CHOICE || CHOICE=0
     case "$CHOICE" in
-        1) MODEL="${MODEL_PREFIX}/deepseek-v4-flash-free"
-           SMALL="${MODEL_PREFIX}/ling-3.0-tiny-free";;
-        2) MODEL="${MODEL_PREFIX}/mimo-v2.5-free"
-           SMALL="${MODEL_PREFIX}/ling-3.0-tiny-free";;
-        3) MODEL="${MODEL_PREFIX}/nemotron-3-ultra-free"
-           SMALL="${MODEL_PREFIX}/ling-3.0-tiny-free";;
-        4) MODEL="${MODEL_PREFIX}/ling-3.0-tiny-free"
-           SMALL="${MODEL_PREFIX}/ling-3.0-tiny-free";;
+        1) MODEL="${MODEL_PREFIX}/nemotron-3-ultra-free"
+           SMALL="${MODEL_PREFIX}/laguna-s-2.1-free";;
+        2) MODEL="${MODEL_PREFIX}/deepseek-v4-flash-free"
+           SMALL="${MODEL_PREFIX}/laguna-s-2.1-free";;
+        3) MODEL="${MODEL_PREFIX}/nematron-3.5-lightning-free"
+           SMALL="${MODEL_PREFIX}/laguna-s-2.1-free";;
+        4) MODEL="${MODEL_PREFIX}/mimo-v2.5-free"
+           SMALL="${MODEL_PREFIX}/laguna-s-2.1-free";;
         5) echo -n "  Model ID: "; read -r CUSTOM
            [ -n "$CUSTOM" ] && MODEL="$CUSTOM"
            echo -n "  Small Model ID (Enter thakbe): "; read -r CSMALL
@@ -96,7 +96,7 @@ pick_model() {
 }
 
 case "${1:-}" in
-    model|max|default|mid|medium|ultra|strong|tiny)
+    model|ultra|strong|max|flash|fast|lightning|mid|medium|default)
         pick_model "$MODEL" "${2:-}"
         apply_model "$MODEL" "$SMALL"
         echo

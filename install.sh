@@ -499,6 +499,12 @@ except Exception:
 for k in ("username", "model", "small_model", "default_agent"):
     if k not in base and k in new:
         base[k] = new[k]
+# dead-model auto-fix: free list theke ling-3.0 sora feleche — silent fail hototo
+if "ling-3.0" in base.get("small_model", ""):
+    base["small_model"] = new.get("small_model", "zyvo/laguna-s-2.1-free")
+# purono default (flash) → notun full-power default (ultra); custom choice untouched
+if base.get("model", "").endswith("deepseek-v4-flash-free") and "model" in new:
+    base["model"] = new["model"]
 # performance keys (phone lag/heat fix) — user set thakle touch hoy na
 base.setdefault("snapshot", False)
 base.setdefault("autoupdate", False)
