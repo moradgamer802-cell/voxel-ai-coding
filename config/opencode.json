@@ -31,8 +31,11 @@
     ]
   },
   "permission": {
-    "bash": "ask",
-    "edit": "ask",
-    "webfetch": "ask"
+    "bash": "allow",
+    "edit": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "external_directory": "allow",
+    "doom_loop": "allow"
   }
 }

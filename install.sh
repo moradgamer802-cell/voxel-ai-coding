@@ -507,10 +507,12 @@ base.setdefault("watcher", new.get("watcher", {}))
 providers = base.setdefault("provider", {})
 for pk, pv in new.get("provider", {}).items():
     providers.setdefault(pk, pv)
-perm = base.setdefault("permission", {})
-for tk in ("bash", "edit", "webfetch"):
-    perm.setdefault(tk, "ask")
-base["permission"] = perm
+# permission system removed — sob allow, kono prompt nai (purono
+# config e "ask" thakleo update e allow hoye jay)
+base["permission"] = {
+    "bash": "allow", "edit": "allow", "webfetch": "allow",
+    "websearch": "allow", "external_directory": "allow", "doom_loop": "allow",
+}
 with open(dst, "w") as fh:
     json.dump(base, fh, indent=2)
     fh.write("\n")
@@ -580,11 +582,10 @@ echo
 printf "${GREEN}${BOLD}  [%s] 100%%  ZYVO AI Ready ✓${RESET}  ${DIM}(%ss · %s · %s)${RESET}\n" \
     "$(bar 100)" "$(( $(now) - INSTALL_START ))" "$ENV_KIND/$ARCH" "$MODE"
 echo
-printf "  ${BOLD}zyvo${RESET}              ${DIM}AI start — auto-allow (kono permission prompt nai)${RESET}\n"
-printf "  ${BOLD}zyvo --safe${RESET}        ${DIM}prompt mode — Allow once / Always allow / Reject${RESET}\n"
+printf "  ${BOLD}zyvo${RESET}              ${DIM}AI start — kono permission prompt nai${RESET}\n"
 printf "  ${BOLD}zyvo session <naam>${RESET}  ${DIM}notun/resume session — zyvo/<naam>/ folder e${RESET}\n"
-printf "  ${BOLD}oc-settings${RESET}        ${DIM}model tier + permission menu${RESET}\n"
-printf "  ${BOLD}/dekho /fix /review /model /perm /session /safe /zyvo${RESET}  ${DIM}in-chat${RESET}\n"
+printf "  ${BOLD}oc-settings${RESET}        ${DIM}model tier menu${RESET}\n"
+printf "  ${BOLD}/dekho /fix /review /model /zyvo${RESET}  ${DIM}in-chat${RESET}\n"
 printf "  ${DIM}version: %s · %s commands · %s skills${RESET}\n" "$VERSION" "$N_CMD" "$N_SKILL"
 if [ "$WARNINGS" -gt 0 ]; then
     printf "\n  ${YELLOW}${BOLD}%d warning:${RESET}" "$WARNINGS"
