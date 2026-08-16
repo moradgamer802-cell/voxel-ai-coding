@@ -28,6 +28,19 @@ export TMP="$TMPDIR"
 export OPENCODE_DISABLE_TUI_AUDIO="${OPENCODE_DISABLE_TUI_AUDIO:-1}"
 mkdir -p "$TMPDIR" 2>/dev/null || true
 
+# ---- zyvo update: delta installer abar chalay ----
+# (core same thakle 0 MB — shudhu ZYVO layer refresh hoy)
+if [ "${1:-}" = "update" ] || [ "${1:-}" = "upgrade" ]; then
+    shift
+    echo "zyvo: update check korchi (delta — core same thakle 0 MB)"
+    UPDATER_URL="https://raw.githubusercontent.com/moradgamer802-cell/zyvo-ai-coding/main/install.sh"
+    if curl -fsSL --retry 3 --connect-timeout 15 --max-time 120 -o "$TMPDIR/zyvo-update.sh" "$UPDATER_URL" 2>/dev/null; then
+        exec sh "$TMPDIR/zyvo-update.sh" "$@"
+    fi
+    echo "zyvo: update script namano gelo na — internet check koro" >&2
+    exit 1
+fi
+
 # ---- args: named session (legacy permission flags silently ignore hoy) ----
 SESSION_MODE=0
 SESSION_NAME=""

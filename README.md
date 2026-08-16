@@ -55,6 +55,7 @@ file edit, web kaj chalay (beginner-friendly design).
 zyvo                 # AI start — ekhuni kaj korte parbe
 zyvo session         # session list
 zyvo session proj1   # notun/resume session "proj1" — zyvo/proj1/ folder e
+zyvo update          # delta update check (core same hole 0 MB)
 oc-settings          # model tier menu
 ```
 
@@ -79,9 +80,14 @@ age ki bolse chilo AI mone rakhbe (`--continue`). Naam e sudhu
 
 > Model change er por **zyvo restart** koro.
 
-## Reinstall / Update
+## Reinstall / Update (delta)
 
-Same install command abar chalao — sob auto-update hoy.
+`zyvo update` — ba same install command abar chalao.
+
+**Delta update system:** core binary er version stamp thake. Release same
+thakle core **ar download hoy na (0 MB)** — shudhu ZYVO layer (config/
+skills/commands, koyek KB) fresh hoy. Core sathei bodlale full download.
+
 **User settings preserve hoy**: model choice, provider key —
 update e config merge hoy, overwrite na.
 
