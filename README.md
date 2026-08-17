@@ -1,6 +1,6 @@
 # ZYVO — OpenCode (Ready-to-Use AI Coding CLI)
 
-OpenCode (AI coding agent) ke fully customized — **install korlei chole**.
+zyvo (AI coding agent) ke fully customized — **install korlei chole**.
 Termux e native Android build (no proot, no glibc), ar Ubuntu proot / Debian /
 Chromebook / WSL / macOS eo auto install hoy.
 
