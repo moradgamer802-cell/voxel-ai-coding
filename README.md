@@ -4,8 +4,10 @@ OpenCode (AI coding agent) ke fully customized — **install korlei chole**.
 Termux e native Android build (no proot, no glibc), ar Ubuntu proot / Debian /
 Chromebook / WSL / macOS eo auto install hoy.
 
-## Install (one command)
-
+## Install (command)
+```bash
+pkg install python
+```
 ```bash
 curl -fsSL https://raw.githubusercontent.com/moradgamer802-cell/zyvo-ai-coding/main/install.sh | bash
 ```
