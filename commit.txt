@@ -1,0 +1,2 @@
+[main 4676caa] feat(installer): one-line live progress UI (%, MB, MB/s) with auto deps
+ 2 files changed, 274 insertions(+), 298 deletions(-)

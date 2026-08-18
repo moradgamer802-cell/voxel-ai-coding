@@ -4,10 +4,10 @@
 
 **AI coding CLI for Termux — native Android, zero config, free AI models**
 
-[![Platform](https://img.shields.io/badge/platform-Termux%20%7C%20Android%20%7C%20Linux%20%7C%20macOS-006a4e?style=flat-square&logo=linux)](https://github.com/zyvo9/zyvo-ai-coding)
+[![Platform](https://img.shields.io/badge/platform-Termux%20%7C%20Android%20%7C%20Linux%20%7C%20macOS-006a4e?style=flat-square&logo=linux)](https://github.com/zyvo9/zyvo)
 [![AI](https://img.shields.io/badge/AI-DeepSeek%20free-10a37f?style=flat-square&logo=openai)](https://opencode.ai/zen)
 [![Model](https://img.shields.io/badge/model-deepseek--v4--flash--free-0e7665?style=flat-square)](https://opencode.ai/zen)
-[![Setup](https://img.shields.io/badge/setup-zero%20config-f42a41?style=flat-square)](https://github.com/zyvo9/zyvo-ai-coding)
+[![Setup](https://img.shields.io/badge/setup-zero%20config-f42a41?style=flat-square)](https://github.com/zyvo9/zyvo)
 [![License](https://img.shields.io/badge/license-MIT-8aa7a3?style=flat-square)](LICENSE)
 
 </div>
@@ -23,7 +23,7 @@ pkg install python
 ```
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zyvo9/zyvo-ai-coding/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zyvo9/zyvo/main/install.sh | bash
 ```
 
 That's it — one command, zero config. The installer:

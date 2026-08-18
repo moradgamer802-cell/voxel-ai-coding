@@ -33,7 +33,7 @@ mkdir -p "$TMPDIR" 2>/dev/null || true
 if [ "${1:-}" = "update" ] || [ "${1:-}" = "upgrade" ]; then
     shift
     echo "zyvo: checking for updates (delta — 0 MB if the core is unchanged)"
-    UPDATER_URL="https://raw.githubusercontent.com/zyvo9/zyvo-ai-coding/main/install.sh"
+    UPDATER_URL="https://raw.githubusercontent.com/zyvo9/zyvo/main/install.sh"
     if curl -fsSL --retry 3 --connect-timeout 15 --max-time 120 -o "$TMPDIR/zyvo-update.sh" "$UPDATER_URL" 2>/dev/null; then
         exec sh "$TMPDIR/zyvo-update.sh" "$@"
     fi
@@ -44,7 +44,7 @@ fi
 # ---- zyvo uninstall: removes ZYVO cleanly (needs the repo script) ----
 if [ "${1:-}" = "uninstall" ]; then
     shift
-    UNINSTALLER_URL="https://raw.githubusercontent.com/zyvo9/zyvo-ai-coding/main/scripts/zyvo-uninstall"
+    UNINSTALLER_URL="https://raw.githubusercontent.com/zyvo9/zyvo/main/scripts/zyvo-uninstall"
     UNINSTALLER=""
     # prefer a local copy (installed layout), else the current repo
     for c in "$dir/../share/zyvo/scripts/zyvo-uninstall" "$dir/zyvo-uninstall" "$TMPDIR/zyvo-uninstall"; do

@@ -2,7 +2,7 @@
 # ============================================================
 #  ZYVO — one-line installer
 #  Install: curl -fsSL https://raw.githubusercontent.com/
-#           zyvo9/zyvo-ai-coding/main/install.sh | bash
+#           zyvo9/zyvo/main/install.sh | bash
 #
 #  Shows a SINGLE live progress line:
 #    [██████░░░░░░░░░░░░░░] 32% | 9.4/29.1 MB | 1.1 MB/s | downloading core
@@ -15,7 +15,7 @@ umask 022
 # ------------------------------------------------------------
 # Configuration
 # ------------------------------------------------------------
-GH_REPO="${GH_REPO:-zyvo9/zyvo-ai-coding}"
+GH_REPO="${GH_REPO:-zyvo9/zyvo}"
 CORE_REPO="guysoft/opencode-termux"
 API="https://api.github.com"
 CORE_API="$API/repos/$CORE_REPO"

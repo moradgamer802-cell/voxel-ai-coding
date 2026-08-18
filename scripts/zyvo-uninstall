@@ -68,4 +68,4 @@ fi
 
 echo
 echo "ZYVO uninstalled. Your projects are still at /storage/emulated/0/zyvo."
-echo "Reinstall any time with:  curl -fsSL https://raw.githubusercontent.com/zyvo9/zyvo-ai-coding/main/install.sh | bash"
+echo "Reinstall any time with:  curl -fsSL https://raw.githubusercontent.com/zyvo9/zyvo/main/install.sh | bash"
