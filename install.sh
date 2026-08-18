@@ -3,6 +3,10 @@
 #  ZYVO — one-line installer
 #  Install: curl -fsSL https://raw.githubusercontent.com/
 #           zyvo9/zyvo/main/install.sh | bash
+#      or:  pip install zyvo && zyvo        (same installer)
+#
+#  When run by the pip bootstrap, the ZYVO layer is already on
+#  disk at $ZYVO_BOOT and is used instead of downloading it.
 #
 #  Shows a SINGLE live progress line:
 #    [██████░░░░░░░░░░░░░░] 32% | 9.4/29.1 MB | 1.1 MB/s | downloading core
@@ -326,6 +330,13 @@ setup_core() {
 # Step 4 — ZYVO layer (wrapper, config, skills, commands)
 # ------------------------------------------------------------
 setup_layer() {
+    # pip/bootstrap route: layer already on disk — skip network fetch
+    if [ -n "$ZYVO_BOOT" ] && [ -d "$ZYVO_BOOT/scripts" ] && [ -d "$ZYVO_BOOT/config" ]; then
+        status "zyvo layer ready (pip bootstrap)"
+        rm -rf "$TMP"/* 2>/dev/null || true
+        cp -a "$ZYVO_BOOT/." "$TMP/"
+        bump 75
+    else
     status "downloading zyvo layer"
     if curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 120 \
         -o "$TMP/layer.tar.gz" "https://codeload.github.com/$GH_REPO/tar.gz/refs/heads/main" 2>/dev/null; then
@@ -338,6 +349,7 @@ setup_layer() {
             || fatal "couldn't download the ZYVO layer" "Check your internet and rerun."
     fi
     bump 75
+    fi
 
     # wrapper + helpers
     install_script "$TMP/scripts/zyvo" "$BIN_DIR/zyvo"
@@ -434,6 +446,9 @@ verify_install() {
 # entry
 # ------------------------------------------------------------
 if [ "${1:-}" = "uninstall" ]; then
+    if [ -n "$ZYVO_BOOT" ] && [ -f "$ZYVO_BOOT/scripts/zyvo-uninstall" ]; then
+        exec sh "$ZYVO_BOOT/scripts/zyvo-uninstall" "${@:2}"
+    fi
     SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo "$PWD")"
     if [ -f "$SCRIPT_DIR/scripts/zyvo-uninstall" ]; then
         exec sh "$SCRIPT_DIR/scripts/zyvo-uninstall" "${@:2}"
@@ -461,4 +476,7 @@ printf "  ${C_B}zyvo preview${C_N}      open a page in the browser\n"
 printf "  ${C_B}zyvo session <n>${C_N}  new/resume a session\n"
 printf "  ${C_B}zyvo update${C_N}       delta update\n"
 printf "  ${C_B}zyvo uninstall${C_N}    remove ZYVO (keeps projects)\n"
+if [ -n "$ZYVO_BOOT" ]; then
+    printf "  ${C_D}installed via pip — update layer with:${C_N} ${C_B}zyvo install${C_N}\n"
+fi
 printf "\n  ${C_D}open a new shell, then run:${C_N} ${C_B}zyvo${C_N}\n\n"

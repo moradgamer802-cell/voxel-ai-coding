@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zyvo"
+version = "0.1.0"
+description = "ZYVO — ready-to-use AI coding CLI (OpenCode) for Termux. One command, zero config."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "zyvo9" }]
+keywords = ["ai", "cli", "terminal", "termux", "opencode", "coding-agent", "android"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development",
+]
+dependencies = []
+
+[project.scripts]
+zyvo = "zyvo.cli:main"
+
+[tool.setuptools]
+packages = ["zyvo"]
+
+[tool.setuptools.package-dir]
+zyvo = "python/zyvo"
