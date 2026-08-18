@@ -19,14 +19,12 @@ on Ubuntu proot / Debian / Chromebook / WSL / macOS as well.
 ## Install
 
 ```bash
-pkg install python
-```
-
-```bash
 curl -fsSL https://raw.githubusercontent.com/zyvo9/zyvo/main/install.sh | bash
 ```
 
-That's it — one command, zero config. The installer:
+That's it — **one command, zero config**. No `pkg install` needed beforehand:
+python, ripgrep, unzip and git are auto-installed if missing, and skipped if
+already present. The installer:
 
 - shows a **single live progress line** (`[████░░░░] 42% | 18.4/29.1 MB | 1.1 MB/s`)
   for the core download and for every long step, so you always know where it is
