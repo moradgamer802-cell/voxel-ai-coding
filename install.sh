@@ -39,10 +39,19 @@ warn()  { WARNINGS=$((WARNINGS+1)); printf "    ${YELLOW}!${RESET} %s\n" "$1"; }
 skip()  { SKIPPED="$SKIPPED\n      · $1"; warn "$1"; }
 fatal() {
     echo
-    printf "  ${RED}${BOLD}╭─ INSTALL FAIL ──────────────────────────╮${RESET}\n"
-    printf "  ${RED}${BOLD}│${RESET} %s\n" "$1"
-    [ -n "$2" ] && printf "  ${RED}${BOLD}│${RESET} ${DIM}fix:${RESET} %s\n" "$2"
-    printf "  ${RED}${BOLD}╰──────────────────────────────────────────╯${RESET}\n"
+    printf "  ${RED}${BOLD}╭─ INSTALL FAIL ─────────────────────────╮${RESET}\n"
+    if command -v fold >/dev/null 2>&1; then
+        printf '%s' "$1" | fold -s -w 40 | while IFS= read -r line; do
+            printf "  ${RED}${BOLD}│${RESET} %-40s ${RED}${BOLD}│${RESET}\n" "$line"
+        done
+        [ -n "$2" ] && printf '%s' "$2" | fold -s -w 36 | while IFS= read -r line; do
+            printf "  ${RED}${BOLD}│${RESET} ${DIM}fix:${RESET} %-35s ${RED}${BOLD}│${RESET}\n" "$line"
+        done
+    else
+        printf "  ${RED}${BOLD}│${RESET} %s\n" "$1"
+        [ -n "$2" ] && printf "  ${RED}${BOLD}│${RESET} ${DIM}fix:${RESET} %s\n" "$2"
+    fi
+    printf "  ${RED}${BOLD}╰─────────────────────────────────────────╯${RESET}\n"
     echo
     exit 1
 }
@@ -286,9 +295,40 @@ step_ok
 
 # ---------- [3] core (DELTA) ----------
 step "core engine (delta check)"
-gh_latest_tag() { # $1=repo api url
-    curl -fsSL --connect-timeout 8 --max-time 20 "$1" 2>/dev/null \
-        | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n1
+gh_latest_tag() { # $1=repo api url — python parses the JSON, sed fallback
+    local api="$1" out=""
+    if command -v python3 >/dev/null 2>&1; then
+        out="$(curl -fsSL --connect-timeout 8 --max-time 20 "$api" 2>/dev/null \
+            | python3 -c "import json,sys
+try:
+    print(json.load(sys.stdin).get('tag_name',''))
+except Exception:
+    print('')" 2>/dev/null)"
+    else
+        out="$(curl -fsSL --connect-timeout 8 --max-time 20 "$api" 2>/dev/null \
+            | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n1)"
+    fi
+    printf '%s' "$out" | tr -d '[:space:]'
+}
+gh_zip_url() { # $1=repo api url $2=asset name match — first matching zip URL
+    local api="$1" want="$2" out=""
+    if command -v python3 >/dev/null 2>&1; then
+        out="$(curl -fsSL --connect-timeout 10 --max-time 30 "$api" 2>/dev/null \
+            | python3 -c "import json,sys
+try:
+    r = json.load(sys.stdin)
+    for a in r.get('assets', []):
+        n = a.get('name','')
+        if '$want' in n and n.endswith('.zip'):
+            print(a['browser_download_url'])
+            break
+except Exception:
+    pass" 2>/dev/null)"
+    else
+        out="$(curl -fsSL --connect-timeout 10 --max-time 30 "$api" 2>/dev/null \
+            | grep -o "https://[^\"]*${want}\.zip" | head -n1)"
+    fi
+    printf '%s' "$out" | tr -d '[:space:]'
 }
 OC_OFFICIAL_BIN=""
 SKIP_CORE=0
@@ -304,19 +344,19 @@ if [ "$ENV_KIND" = "termux" ]; then
         say "core UP-TO-DATE ($LATEST_TAG) — 0 MB download, skipping"
     else
         [ -n "$INSTALLED_TAG" ] && info "core update: $INSTALLED_TAG → ${LATEST_TAG:-latest}"
-        case "$ARCH" in
-            aarch64|arm64) ZIP_MATCH="android-aarch64";;
-            x86_64|amd64)  ZIP_MATCH="android-x86_64";;
-        esac
-        ZIP_URL="$(curl -fsSL --connect-timeout 10 --max-time 30 "https://api.github.com/repos/$REPO/releases/latest" \
-            | grep -o "https://[^\"]*${ZIP_MATCH}\.zip" | head -n1 || true)"
+        # try native aarch64 first; x86_64 falls back to aarch64 build when
+        # no x86_64 zip exists in the release (guysoft currently ships aarch64 only)
+        ZIP_MATCH="android-aarch64"
+        ZIP_URL="$(gh_zip_url "https://api.github.com/repos/$REPO/releases/latest" "$ZIP_MATCH" || true)"
+        if [ -z "$ZIP_URL" ] && { [ "$ARCH" = "x86_64" ] || [ "$ARCH" = "amd64" ]; }; then
+            warn "no android-x86_64 zip in release — falling back to aarch64 build (works via proot/emulation, may be slower)"
+        fi
         if [ -z "$ZIP_URL" ]; then
-            [ "$ZIP_MATCH" = "android-x86_64" ] && \
-                fatal "No native build released for Termux x86_64 yet." \
-                      "Run it in Ubuntu proot on the emulator/Chromebook — the installer auto-installs the official build there."
-            fatal "no native build found for $ARCH." "Install inside Ubuntu proot (official build auto-installed)"
+            fatal "no native Android build found in the latest release of $REPO." \
+                  "Install inside Ubuntu proot (official build auto-installs there), or wait for a new release."
         fi
         SUMS_URL="${ZIP_URL%/*}/SHA256SUMS"
+        info "download: $(basename "$ZIP_URL")"
         dlprogress "$ZIP_URL" "$TMP/opencode.zip" || fatal "download failed — check your internet." "Rerun the installer (resume supported)"
         if curl -fsSL --retry 3 --connect-timeout 15 --max-time 60 -o "$TMP/SHA256SUMS" "$SUMS_URL" 2>/dev/null; then
             EXPECTED="$(grep "$(basename "$ZIP_URL")" "$TMP/SHA256SUMS" | awk '{print $1}' | head -n1)"
