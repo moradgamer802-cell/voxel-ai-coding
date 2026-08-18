@@ -25,6 +25,16 @@ pkg install python
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zyvo9/zyvo-ai-coding/main/install.sh | bash
 ```
+
+That's it — one command, zero config. The installer:
+
+- shows a **single live progress line** (`[████░░░░] 42% | 18.4/29.1 MB | 1.1 MB/s`)
+  for the core download and for every long step, so you always know where it is
+- **auto-installs missing dependencies** (`pkg`/`apt`) and skips what you already have
+- keeps a **built-in free AI key** (zero config — override with `ZEN_API_KEY`)
+- is **safe to re-run** — updates the core delta-wise (0 MB if nothing changed)
+- **resumes interrupted downloads** and verifies the core with SHA256
+
 ## Update
 ```bash
 zyvo update
