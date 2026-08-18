@@ -1,15 +1,15 @@
 ---
 name: react-next-best-practices
-description: React / Next.js — modern best practices diye clean, scalable, performant app. Use for any React or Next.js task.
+description: React / Next.js — clean, scalable, performant apps with modern best practices. Use for any React or Next.js task.
 ---
 
 # React + Next.js Best Practices (Full-Power)
 
 ## Component rules
-- Functional component + hooks only — class component na
-- Choto rakho: ek component ek kaj; 150+ line = bhago
-- Logic UI theke alaga: custom hook (`useUserData`) e nikolo
-- Prop drilling 3 level beshi = Context ba state lib (zustand halka valo)
+- Functional components + hooks only — no class components
+- Keep them small: one component does one thing; 150+ lines = split it
+- Separate logic from UI: extract custom hooks (`useUserData`)
+- Prop drilling beyond 3 levels = Context or a state lib (zustand is light and good)
 - Early return pattern:
 ```jsx
 if (!user) return <Login />;
@@ -17,38 +17,38 @@ return <Dashboard user={user} />;
 ```
 
 ## State discipline
-- Server data = library (TanStack Query) — nijer useState+useEffect na
-- Local UI state sokol useState; global minimum rakho
-- Derived value state e rakhba na — calculate koro render e
-- useEffect: sirf sync (external system er sathe). Data fetch effect e na.
+- Server data = a library (TanStack Query) — not your own useState+useEffect
+- Local UI state in useState; keep global state minimal
+- Don't store derived values in state — compute them in render
+- useEffect: only for sync (with external systems). Never for data fetching.
 
 ## Next.js (App Router)
-- Server Component default — `"use client"` sirf jekhane interactivity
-- Data fetch: async Server Component e direct await — API route na lage
-- Mutation: Server Actions
-- `next/image` (width/height soho), `next/font`, `next/link`
-- Metadata: layout e `export const metadata` — per page override
-- Loading/error UI: `loading.tsx`, `error.tsx` file — user ke blank screen na
+- Server Components by default — `"use client"` only where interactivity lives
+- Data fetching: await directly in an async Server Component — no API route needed
+- Mutations: Server Actions
+- `next/image` (with width/height), `next/font`, `next/link`
+- Metadata: `export const metadata` in layout — per-page override
+- Loading/error UI: `loading.tsx`, `error.tsx` files — never a blank screen for the user
 
 ## Forms + validation
-- Controlled input + inline validation (submit er agei)
-- Zod-type schema validation submit e — server side o same schema
+- Controlled inputs + inline validation (before submit)
+- Zod-type schema validation on submit — same schema on the server side
 
-## Performance (phone user — eita seriously nao)
-- List: stable `key` (index na, dynamic list e)
-- Boro route lazy: `next/dynamic`, `React.lazy`
-- Image: next/image + proper size — hero chara sob lazy
-- Bundle: `npm run build` er por analyze — beshi hole dependency check
-- Re-render: props stable rakho (useCallback sirf measured problem e —
-  everywhere na)
+## Performance (phone users — take this seriously)
+- Lists: stable `key` (not index, especially dynamic lists)
+- Lazy-load big routes: `next/dynamic`, `React.lazy`
+- Images: next/image + proper sizes — lazy everything except the hero
+- Bundle: analyze after `npm run build` — check dependencies if it's big
+- Re-renders: keep props stable (useCallback only on measured problems —
+  not everywhere)
 
 ## TypeScript
-- `any` laal flag — chaile `unknown` + narrow
-- Types co-locate ba `types/`; shared props type export koro
-- API response type alaga define — inline duplinate na
+- `any` is a red flag — use `unknown` + narrowing when needed
+- Types co-located or in `types/`; export shared prop types
+- API response types defined separately — no inline duplication
 
 ## Common bugs guard
-- `key` er moddhe index (reorder hole ghost bug)
-- Effect er cleanup na (event listener leak — phone e memory hit)
-- Conditional hook call (rules of hooks)
-- `useEffect` e stale closure — dependency thik rakho
+- Index as `key` (ghost bugs when reordering)
+- Missing effect cleanup (event listener leaks — memory hits on phones)
+- Conditional hook calls (rules of hooks)
+- Stale closures in `useEffect` — keep dependencies right

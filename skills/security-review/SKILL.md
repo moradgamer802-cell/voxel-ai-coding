@@ -1,48 +1,48 @@
 ---
 name: security-review
-description: Dangerous command/data er age double-check — auto-approve ON thakleo AI nije guard hoy. Use before destructive, network, or sensitive operations.
+description: Double-check before dangerous commands/data — even with auto-approve ON, the AI guards itself. Use before destructive, network, or sensitive operations.
 ---
 
 # Security Review Skill (Full-Power)
 
-## Context: ZYVO te permission NAI
-`permission: allow` mane AI j kichu chalate pare — tai **AI nije guard**.
-Ei skill ta sei guard. Every risky operation er age ei checklist mental run koro.
+## Context: ZYVO has NO permissions
+`permission: allow` means the AI can run anything — so **the AI must guard itself**.
+This skill is that guard. Mentally run this checklist before every risky operation.
 
 ## Gate 1 — Destructive commands
-- `rm -rf` / `rm -r`: exact path bair koro echo diye, variable empty na,
-  `/` `$HOME` `$PREFIX` kokhono target na
-- `mv A B` jokhon B ache = overwrite — age check
-- `dd`, `mkfs`, disk wipe: user er explicit instruction chara na
-- `truncate`/`>` boro file e: age backup (`cp x x.bak`)
-- Bulk delete: age dry-run list dekhao (`find ... -print`), tarpor delete
+- `rm -rf` / `rm -r`: print the exact path with echo first, verify variables are not
+  empty, never target `/` `$HOME` `$PREFIX`
+- `mv A B` when B exists = overwrite — check first
+- `dd`, `mkfs`, disk wipe: never without the user's explicit instruction
+- `truncate`/`>` on large files: backup first (`cp x x.bak`)
+- Bulk delete: show a dry-run list first (`find ... -print`), then delete
 
 ## Gate 2 — Network
-- `curl ... | sh/bash`: script ta AGE poro (download kore `less`/`head`),
-  tarpor chalao — blind pipe na
-- User er file upload/bhejte dewa: explicit permission chara na
-- `git push` public repo e: secrets diff check age (Gate 3)
-- Onno server e data POST: user jane + HTTPS
+- `curl ... | sh/bash`: READ the script first (download and `less`/`head`),
+  then run — never blind pipe
+- Uploading/sending the user's files: never without explicit permission
+- `git push` to public repo: check the diff for secrets first (Gate 3)
+- POSTing data to another server: user knows + HTTPS
 
 ## Gate 3 — Secrets
-- API key/token/password: code e hardcode NA — `.env` + `.env.example` pattern
-- Echo/log/commit e secret print na; accidental thakle turant delete + rotate
-- `.gitignore` e `.env` ache kina notun repo te check
-- User er diye dewa key repo push hoy — fjell porle abar new key nao (rotate)
+- API keys/tokens/passwords: NEVER hardcode — use `.env` + `.env.example` pattern
+- Never print secrets in echo/log/commit; if one leaks, delete + rotate immediately
+- Check that `.env` is in `.gitignore` for new repos
+- If a key the user gave you gets pushed to the repo — tell them to get a new key (rotate)
 
 ## Gate 4 — System
-- `chmod 777` na (755 file, 700 dir)
-- `sudo`/root: Termux e nai; proot e avoid — user-level solve try koro
-- System config edit (`/etc/`, `$PREFIX/etc/`): age backup, age bolo
+- No `chmod 777` (755 for files, 700 for dirs)
+- `sudo`/root: not in Termux; avoid in proot — try user-level solutions first
+- System config edits (`/etc/`, `$PREFIX/etc/`): backup first, announce first
 
-## Workflow risky kaj peye gele
-1. Banglish e 2-3 line e bolo: ki korbe, ki risk, reversible kina
-2. Irreversible + user absent? Koro NA — note rekhe dao
-3. Safe alternative khujо: dry-run flag, temp copy, `-i` interactive
-4. Auto-approve thakleo: destructive + irreversible hole user ke PROSHON koro
+## Workflow when a risky operation appears
+1. Say in 2-3 lines: what will be done, what the risk is, whether it is reversible
+2. Irreversible + user absent? Do NOT do it — leave a note
+3. Look for a safe alternative: dry-run flag, temp copy, `-i` interactive
+4. Even with auto-approve: ask the user before destructive + irreversible actions
 
-## Website/app deliver korar somoy check
-- Form input sanitize (XSS) — user content HTML e directly inject na
-- API key frontend e expose na (public hole bolo)
-- SQL: parameterized query — string concat na
-- `target="_blank"` e `rel="noopener"` 
+## When delivering a website/app
+- Sanitize form input (XSS) — never inject user content into HTML directly
+- Don't expose API keys in frontend code (say it if it's public anyway)
+- SQL: parameterized queries — no string concatenation
+- `target="_blank"` must have `rel="noopener"`

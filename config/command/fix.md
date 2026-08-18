@@ -1,14 +1,14 @@
 ---
-description: Error/bug fix kore — test kore verify kore, tarpor explain kore.
+description: Fix errors/bugs — verify with tests, then explain.
 agent: build
 ---
 
-Fix korbo: $ARGUMENTS
+Will fix: $ARGUMENTS
 
-1. Age error reproduce/understand koro
-2. Root cause khuje berao
-3. Fix koro — minimal, clean change
-4. Verify koro (test cholao jodi possible)
-5. Banglish e explain: ki problem chilo, kemon fix korlam, ar future e kano hobe na
+1. First reproduce/understand the error
+2. Find the root cause
+3. Fix it — minimal, clean change
+4. Verify (run tests if possible)
+5. Explain in English: what the problem was, how it was fixed, and why it won't happen again
 
-Fix ta korte file change korte paro, kintu fix er age user ke baton dao ki korte jaccho.
+You may change files to fix the issue, but tell the user what you are about to do before fixing.

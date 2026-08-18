@@ -1,45 +1,45 @@
 ---
 name: debugging-fixes
-description: Systematic debugging — error fix, crash solve, kaj na korar karon ber kora. Use when user reports any problem, error, crash, or unexpected behavior.
+description: Systematic debugging — fix errors, solve crashes, find why something is not working. Use when user reports any problem, error, crash, or unexpected behavior.
 ---
 
 # Debugging Skill (Full-Power)
 
 ## Golden rule
-Error message ta PURA poro. Asol karon error er last 3-5 line e thake.
-Guess kore fix korar cheye pora 10 second beshi valo.
+Read the ENTIRE error message. The real cause is usually in the last 3-5 lines of the error.
+Reading it for 10 seconds beats guessing a fix.
 
-## Systematic method (order e — jump na)
-1. **REPRODUCE** — error ta abar hoy kina dekho (run koro)
-2. **READ** — error + stack trace pura poro. Kon file, kon line? `file:line` mark koro
-3. **ISOLATE** — choto test case banao ba related file poro (read tool).
-   Choto kore problem zone ber na korar por touch na
-4. **ROOT CAUSE** — symptom na, karon fix koro. "Eta delete korle error chai"
-   mane delete ta hiding, fixing na
-5. **FIX** — choto, targeted change. Puro file rewrite na. Surgical edit,
-   age `cp x x.bak` backup jodi risky lage
-6. **VERIFY** — abar chalao. Kaj korle regression check: ager working feature
-   break hoilo kina dekho
-7. **EXPLAIN** — user ke Banglish e 2-3 line: ki bhenge chilo, ki fix korle,
-   restart/reinstall lagle exact command ta bolo
+## Systematic method (in order — no skipping)
+1. **REPRODUCE** — check whether the error happens again (run it)
+2. **READ** — read the whole error + stack trace. Which file, which line? Mark `file:line`
+3. **ISOLATE** — make a small test case or read the related file (read tool).
+   Do not touch anything until you have narrowed down the problem zone
+4. **ROOT CAUSE** — fix the cause, not the symptom. "Deleting this makes the error go
+   away" means the deletion is hiding the problem, not fixing it
+5. **FIX** — small, targeted change. No full-file rewrites. Surgical edit,
+   `cp x x.bak` backup first if it feels risky
+6. **VERIFY** — run again. If it works, regression check: make sure previously
+   working features did not break
+7. **EXPLAIN** — tell the user in 2-3 lines: what was broken, what was fixed,
+   and the exact command if a restart/reinstall is needed
 
 ## Tool tricks
 - `sh -n script.sh` — shell syntax check, `node --check f.js`, `python3 -m py_compile f.py`
-- Log nei? `console.log` / `print` boshao isolate korar jonjo — fix er por remove
-- Web e: browser console errors user ke copy korte bolo
-- Dependency error: version mismatch common — `npm ls`, lock file, changelog dekho
+- No logs? Add `console.log` / `print` to isolate — remove them after the fix
+- Web: ask the user to copy the browser console errors
+- Dependency errors: version mismatch is common — check `npm ls`, the lock file, changelogs
 
-## Common quick wins (BD user der common scene)
-- `command not found` → package missing / PATH e nai
-- Node `ERR_MODULE_NOT_FOUND` → relative import e `.js` extension / path bhul
+## Common quick wins
+- `command not found` → package missing / not on PATH
+- Node `ERR_MODULE_NOT_FOUND` → missing `.js` extension on relative import / wrong path
 - Python `ModuleNotFoundError` → `pip install <mod>`
-- Website blank/kaj korena → file path **case-sensitive** (Linux!), cache hard-refresh
-- Port in use → onno port ba `kill $(lsof -t -i:PORT)`
-- CORS error → API side e CORS lagbe ba same-origin proxy
-- Termux e build tool fail → glibc dependency — proot Ubuntu ba alternative package
+- Blank/not working website → file paths are **case-sensitive** (Linux!), hard-refresh the cache
+- Port in use → different port or `kill $(lsof -t -i:PORT)`
+- CORS error → the API side needs CORS, or use a same-origin proxy
+- Termux build tool fails → glibc dependency — use proot Ubuntu or an alternative package
 
-## Stuck hole (2 attempt er por)
-- Exact error string diye websearch koro
-- Version migration notes dekho — upgrade e API change hoy
-- Step back: choto banao — minimum working example e aste aste feature add koro
-- User ke 3 ta jineish pobol: ki korte giyechilo / ki asha korcilo / ki hocche
+## If stuck (after 2 attempts)
+- Websearch the exact error string
+- Check version migration notes — APIs change between upgrades
+- Step back: make it smaller — start from a minimum working example and add features gradually
+- Ask the user 3 things: what they were trying to do / what they expected / what actually happens

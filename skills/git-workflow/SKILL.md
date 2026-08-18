@@ -1,6 +1,6 @@
 ---
 name: git-workflow
-description: Clean, safe git — repo banao, commit, branch, push, conflict resolve, GitHub e upload. Use for any git/GitHub task.
+description: Clean, safe git — create repos, commit, branch, push, resolve conflicts, upload to GitHub. Use for any git/GitHub task.
 ---
 
 # Git Workflow Skill (Full-Power)
@@ -10,54 +10,54 @@ description: Clean, safe git — repo banao, commit, branch, push, conflict reso
 git config --global user.name "Name"
 git config --global user.email "email@example.com"
 ```
-- Push er jonno GitHub PAT lagbe (fine-grained, sirf repo access) — user ke
-  setup e help koro; key kokhono file e save kore rakhna/log korona
+- Pushing needs a GitHub PAT (fine-grained, repo access only) — help the user
+  set it up; never save or log the key in any file
 
 ## Safety rules
-- User na chaile commit/push na
-- Commit er age: `git status` + `git diff` dekho — sirf intended file stage
-- Secrets check: `.env`, `*.key`, token — diff e thakle rokhe jao
-  - `.gitignore` e `.env` boshao age thekei
-- `git push --force` kokhono na (user explicitly chaile warning soho)
-- History rewrite na (rebase -i, amend pushed commit) — fix-forward koro
+- No commit/push unless the user asked for it
+- Before committing: check `git status` + `git diff` — stage only intended files
+- Secret check: `.env`, `*.key`, tokens — if they appear in the diff, stop
+  - Put `.env` in `.gitignore` from the start
+- Never `git push --force` (only if the user explicitly asks, with a warning)
+- Never rewrite history (rebase -i, amending pushed commits) — fix forward
 
 ## Daily flows
 ```sh
-# notun kaj
+# new work
 git checkout -b feature/login
-# ... kaj ...
+# ... work ...
 git add <files> && git commit -m "login page add"
 
-# update niye ese
+# pull updates
 git pull --ff-only
 
-# bhul commit undo (soft — change thake)
+# undo last commit (soft — changes stay)
 git reset --soft HEAD~1
 
-# local mess thekao
-git stash        # ...porer kaj... 
+# save local mess for later
+git stash        # ...do other work...
 git stash pop
 
-# kono file er change feliye dao (commit korar age)
+# discard a file's changes (before committing)
 git checkout -- <file>
 ```
 
 ## Commit message style
-- Choto + present tense: `add login page`, `fix navbar overflow on mobile`
-- Keno change holo (big hole body te 2-3 line)
+- Short + present tense: `add login page`, `fix navbar overflow on mobile`
+- Why the change happened (2-3 lines in the body for big changes)
 
 ## Conflict resolve
-1. `git status` — kon file conflict
-2. File poro — `<<<<<<<` marker duita side e
-3. Due side er INTENTION bujhe merge koro — ek side blind choose na
-4. Marker delete, `git add`, commit
+1. `git status` — which files conflict
+2. Read the file — the `<<<<<<<` markers show both sides
+3. Merge based on BOTH sides' intention — never blindly pick one side
+4. Delete the markers, `git add`, commit
 
-## GitHub e notun project upload (common BD user request)
+## Uploading a new project to GitHub
 ```sh
 git init && git add . && git commit -m "first commit"
 git branch -M main
 git remote add origin https://github.com/<user>/<repo>.git
 git push -u origin main
 ```
-- Boro file (50MB+) GitHub e jay na — Git LFS ba media cloud link
-- Repo public/private user ke confirm kore nio
+- Files over 50MB won't go to GitHub — use Git LFS or a media cloud link
+- Confirm with the user whether the repo should be public or private

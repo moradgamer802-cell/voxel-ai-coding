@@ -1,15 +1,16 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # ZYVO — ready-to-use AI coding CLI installer (v3 UI + delta update)
 #
-# Delta update: core binary er version stamp rakha hoy. Latest release tag
-# mile gele core AR download hoy na (0 MB) — shudhu ZYVO layer (config/
-# skills/commands — koyek KB) fresh hoy. Core bodlalei full download.
+# Delta update: the core binary carries a version stamp. If the latest
+# release tag matches, the core is NOT downloaded again (0 MB) — only the
+# ZYVO layer (config/skills/commands — a few KB) is refreshed. If the core
+# changed, a full download runs.
 #
-# Termux (native aarch64) + glibc Linux (Ubuntu proot/Debian/WSL) + macOS.
+# Supports: Termux (native aarch64) + glibc Linux (Ubuntu proot/Debian/WSL) + macOS.
 set -e
 
 REPO="guysoft/opencode-termux"
-GH_REPO="${GH_REPO:-moradgamer802-cell/zyvo-ai-coding}"
+GH_REPO="${GH_REPO:-zyvo9/zyvo-ai-coding}"
 DEFAULT_ZEN_KEY="${ZEN_API_KEY:-sk-PKOWRt2391BL0MP3W90yaG8qx4vofQJQgigJreBBYjrArj0lwuU1HkWUqOHgDGHP}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo "$PWD")"
 CONFIG_DIR="$HOME/.config/opencode"
@@ -121,7 +122,7 @@ dlprogress() { # <url> <out> — live download bar (resume + retry built in)
             sleep 0.25
         done
         if wait "$curl_pid"; then rc=0; break; fi
-        warn "download attempt $attempt fail — resume kore abar try korchi"
+        warn "download attempt $attempt failed — retrying with resume"
         sleep 2
     done
     [ "$TTY" = 1 ] && printf "\r\033[K"
@@ -139,7 +140,7 @@ banner() {
         printf "  ${GREEN}${BOLD} ▄▀█ █   █▀▀ █▀█ █ █ █▀█ ▄▀█${RESET}\n"
         printf "  ${GREEN}${BOLD} █▀█ █   █▄▄ █▀▄ █▄█ █▀▄ █▀█${RESET}\n"
     fi
-    printf "  ${DIM}AI coding CLI · Banglish · zero-config${RESET}\n"
+    printf "  ${DIM}AI coding CLI · zero-config · English${RESET}\n"
 }
 
 MODE="install"
@@ -157,19 +158,19 @@ elif [ "$KERNEL" = "Linux" ]; then
 elif [ "$KERNEL" = "Darwin" ]; then
     ENV_KIND="darwin"
 fi
-[ -n "$ENV_KIND" ] || fatal "ei platform support kore na (Linux/macOS/Termux chalate hobe)." \
-      "Termux (F-Droid) ba Ubuntu proot use koro."
+[ -n "$ENV_KIND" ] || fatal "this platform is not supported (Linux/macOS/Termux required)." \
+      "Use Termux (F-Droid) or an Ubuntu proot."
 
 case "$ARCH" in
     aarch64|arm64|x86_64|amd64) :;;
     *)
-        fatal "phone ta 32-bit ($ARCH) — AI binary ei arch er jonno banano hoy nai." \
-              "64-bit (arm64/x86_64) phone ba proot Ubuntu (arm64) e chalano.";;
+        fatal "this device is 32-bit ($ARCH) — no AI binary is built for this arch." \
+              "Use a 64-bit (arm64/x86_64) device or Ubuntu proot (arm64).";;
 esac
 
 FREE_KB="$(df -k "$HOME" 2>/dev/null | awk 'NR==2{print $4+0}')"
 if [ -n "$FREE_KB" ] && [ "$FREE_KB" -lt 307200 ]; then
-    warn "free space kom (~$((FREE_KB/1024)) MB) — 300 MB+ rakho"
+    warn "low free space (~$((FREE_KB/1024)) MB) — keep 300 MB+ free"
 fi
 info "$ENV_KIND · $ARCH · prefix: ${PREFIX:-user-local}"
 
@@ -198,7 +199,7 @@ if [ -d /storage/emulated/0 ] && [ -r /storage/emulated/0 ]; then
 elif [ -d /sdcard ] && [ -r /sdcard ]; then
     say "storage OK (/sdcard)"
 else
-    skip "shared storage pawa jayni — Termux e 'termux-setup-storage' chalao"
+    skip "shared storage not available — run 'termux-setup-storage' in Termux"
 fi
 step_ok
 
@@ -226,9 +227,9 @@ glibc_deps() {
 
 if [ "$ENV_KIND" = "termux" ]; then
     if [ "$(id -u)" = "0" ]; then
-        warn "root e pkg chole na — existing tools diye chalabo"
+        warn "pkg does not work as root — using existing tools"
     elif ! command -v pkg >/dev/null 2>&1; then
-        warn "pkg nai — existing tools diye chalabo"
+        warn "pkg not found — using existing tools"
     else
         if needs_update; then
             spin "package index update" pkg update -y || true
@@ -236,25 +237,25 @@ if [ "$ENV_KIND" = "termux" ]; then
         if spin "installing: $DEPS" pkg_install; then
             say "dependencies installed"
         else
-            warn "pkg install fail — retry (fresh index)"
+            warn "pkg install failed — retrying (fresh index)"
             if ! spin "retry" bash -c "pkg update -y; pkg install -y $DEPS"; then
-                if switch_official_repo && spin "official mirror e switch" bash -c "pkg update -y; pkg install -y $DEPS"; then
+                if switch_official_repo && spin "switching to official mirror" bash -c "pkg update -y; pkg install -y $DEPS"; then
                     say "dependencies installed (official mirror)"
                 else
                     tail -n 8 "$TMP/last.log" 2>/dev/null || true
-                    fatal "dependency install fail." "'termux-change-repo' chalao, tarpor installer abar chalao."
+                    fatal "dependency install failed." "Run 'termux-change-repo', then rerun the installer."
                 fi
             fi
         fi
     fi
 elif [ "$ENV_KIND" = "glibc" ]; then
     if command -v curl >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
-        glibc_deps || warn "apt install skip — python3 nile branding patch skip hobe"
+        glibc_deps || warn "apt install skipped — without python3 the branding patch will be skipped"
     else
-        glibc_deps || fatal "curl/tar nai — apt e install koro: apt-get install -y curl tar"
+        glibc_deps || fatal "curl/tar not found — install via apt: apt-get install -y curl tar"
     fi
 else
-    info "macOS — existing tools use korbo"
+    info "macOS — using existing tools"
 fi
 
 heal_broken_libs() {
@@ -262,7 +263,7 @@ heal_broken_libs() {
     out="$(git ls-remote https://github.com/$GH_REPO.git HEAD 2>&1 || true)"
     case "$out" in
         *"cannot locate symbol"*|*"CANNOT LINK"*|*"aborted session"*)
-            warn "Termux packages purono (git/openssl mismatch) — auto upgrade"
+            warn "outdated Termux packages (git/openssl mismatch) — auto upgrading"
             spin "pkg upgrade" bash -c \
                 "pkg update -y; DEBIAN_FRONTEND=noninteractive pkg upgrade -y -o Dpkg::Options::=--force-confold" || true
             say "packages upgraded"
@@ -274,10 +275,10 @@ if [ "$ENV_KIND" = "termux" ] && command -v git >/dev/null 2>&1 && command -v pk
 fi
 
 for dep in curl tar; do
-    command -v "$dep" >/dev/null 2>&1 || fatal "$dep missing." "install koro: $dep"
+    command -v "$dep" >/dev/null 2>&1 || fatal "$dep missing." "install it: $dep"
 done
 for dep in rg unzip python3 git; do
-    command -v "$dep" >/dev/null 2>&1 || skip "$dep nai — kichhu feature skip hobe"
+    command -v "$dep" >/dev/null 2>&1 || skip "$dep not found — some features will be skipped"
 done
 say "required tools present"
 step_ok
@@ -299,7 +300,7 @@ if [ "$ENV_KIND" = "termux" ]; then
     if [ -n "$LATEST_TAG" ] && [ -n "$INSTALLED_TAG" ] && [ "$INSTALLED_TAG" = "$LATEST_TAG" ] \
         && [ -x "$LIBEXEC_DIR/opencode.bin" ]; then
         SKIP_CORE=1
-        say "core UP-TO-DATE ($LATEST_TAG) — 0 MB download, skip"
+        say "core UP-TO-DATE ($LATEST_TAG) — 0 MB download, skipping"
     else
         [ -n "$INSTALLED_TAG" ] && info "core update: $INSTALLED_TAG → ${LATEST_TAG:-latest}"
         case "$ARCH" in
@@ -310,22 +311,22 @@ if [ "$ENV_KIND" = "termux" ]; then
             | grep -o "https://[^\"]*${ZIP_MATCH}\.zip" | head -n1 || true)"
         if [ -z "$ZIP_URL" ]; then
             [ "$ZIP_MATCH" = "android-x86_64" ] && \
-                fatal "Termux x86_64 er native build ekhono release hoyni." \
-                      "Emulator/Chromebook e Ubuntu proot chalao — sekhane installer auto official build bosabe."
-            fatal "$ARCH er jonno native build pawa jayni." "Ubuntu proot e install koro (auto official build)"
+                fatal "No native build released for Termux x86_64 yet." \
+                      "Run it in Ubuntu proot on the emulator/Chromebook — the installer auto-installs the official build there."
+            fatal "no native build found for $ARCH." "Install inside Ubuntu proot (official build auto-installed)"
         fi
         SUMS_URL="${ZIP_URL%/*}/SHA256SUMS"
-        dlprogress "$ZIP_URL" "$TMP/opencode.zip" || fatal "download fail — internet check koro." "installer abar chalao (resume supported)"
+        dlprogress "$ZIP_URL" "$TMP/opencode.zip" || fatal "download failed — check your internet." "Rerun the installer (resume supported)"
         if curl -fsSL --retry 3 --connect-timeout 15 --max-time 60 -o "$TMP/SHA256SUMS" "$SUMS_URL" 2>/dev/null; then
             EXPECTED="$(grep "$(basename "$ZIP_URL")" "$TMP/SHA256SUMS" | awk '{print $1}' | head -n1)"
             ACTUAL="$(sha256sum "$TMP/opencode.zip" 2>/dev/null | awk '{print $1}')"
             if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
                 rm -f "$TMP/opencode.zip"
-                fatal "SHA256 mismatch — download corrupted." "installer abar chalao"
+                fatal "SHA256 mismatch — download corrupted." "Rerun the installer"
             fi
             say "integrity verified (SHA256)"
         else
-            warn "SHA256SUMS pawa jayni — integrity check skip"
+            warn "SHA256SUMS not available — integrity check skipped"
         fi
     fi
     # version compare — android build vs latest opencode (info only)
@@ -333,7 +334,7 @@ if [ "$ENV_KIND" = "termux" ]; then
     OC_LATEST_TAG="$(gh_latest_tag "https://api.github.com/repositories/975734319/releases/latest" || true)"
     OC_LATEST_VER="$(printf '%s' "$OC_LATEST_TAG" | sed 's/[^0-9.]//g')"
     if [ -n "$BUILD_VER" ] && [ -n "$OC_LATEST_VER" ] && [ "$BUILD_VER" != "$OC_LATEST_VER" ]; then
-        info "android build: $BUILD_VER · opencode latest: $OC_LATEST_VER — guysoft notun build dile update e auto ashbe"
+        info "android build: $BUILD_VER · opencode latest: $OC_LATEST_VER — auto-included on next update when guysoft ships a new build"
     fi
 else
     LATEST_TAG="$(gh_latest_tag "https://api.github.com/repositories/975734319/releases/latest" || true)"
@@ -343,14 +344,14 @@ else
     if [ -n "$LATEST_TAG" ] && [ -n "$INSTALLED_TAG" ] && [ "$INSTALLED_TAG" = "$LATEST_TAG" ] \
         && [ -x "$OC_BIN_CHECK" ]; then
         SKIP_CORE=1
-        say "core UP-TO-DATE ($LATEST_TAG) — 0 MB download, skip"
+        say "core UP-TO-DATE ($LATEST_TAG) — 0 MB download, skipping"
     else
         if ! curl -fsSL --retry 3 --connect-timeout 15 --max-time 60 -o "$TMP/oc-install.sh" "https://opencode.ai/install" 2>/dev/null; then
-            fatal "opencode.ai installer namate parlam na." "internet check koro, tarpor abar chalao"
+            fatal "could not fetch the opencode.ai installer." "Check your internet, then rerun"
         fi
         if ! spin "official opencode core install" bash "$TMP/oc-install.sh"; then
             tail -n 8 "$TMP/last.log" 2>/dev/null || true
-            fatal "official core install fail." "log dekhe manually: bash $TMP/oc-install.sh"
+            fatal "official core install failed." "Run manually for the log: bash $TMP/oc-install.sh"
         fi
         say "official core installed"
     fi
@@ -372,7 +373,7 @@ if [ "$ENV_KIND" = "termux" ] && [ "$SKIP_CORE" = 0 ]; then
         elif command -v pkg >/dev/null 2>&1 && spin "libc++ install" pkg install -y libc++; then
             say "libc++ installed (pkg)"
         else
-            skip "libc++ install hoyni — 'pkg install -y libc++' nije chalao"
+            skip "libc++ install failed — run 'pkg install -y libc++' yourself"
         fi
     else
         info "native libs already present"
@@ -417,9 +418,9 @@ fetch_source() {
 if [ -d "$SCRIPT_DIR/config" ] && [ -d "$SCRIPT_DIR/skills" ]; then
     info "local source used ($SCRIPT_DIR)"
 else
-    fetch_source || fatal "source namate parlam na." "internet check koro, ba repo folder theke: bash install.sh"
+    fetch_source || fatal "could not fetch source." "Check your internet, or run from the repo folder: bash install.sh"
     SCRIPT_DIR="$TMP/source"
-    say "source downloaded (delta — koyek KB)"
+    say "source downloaded (delta — a few KB)"
 fi
 step_ok
 
@@ -429,7 +430,7 @@ patch_brand() {
     [ -f "$SCRIPT_DIR/scripts/patch-brand.py" ] && command -v python3 >/dev/null 2>&1 || return 1
     python3 "$SCRIPT_DIR/scripts/patch-brand.py" "$1" "$2" "${@:3}" 2>/dev/null || return 1
 }
-install_script() { # $1=repo path $2=dest — glibc e shebang rewrite kore
+install_script() { # $1=repo path $2=dest — rewrites shebang for glibc
     if [ "$ENV_KIND" = "termux" ]; then
         install -m755 "$1" "$2"
     else
@@ -470,16 +471,16 @@ install_core_official() {
     return 0
 }
 if [ "$SKIP_CORE" = 1 ]; then
-    # core unchanged — shudhu wrapper refresh (binary skip)
+    # core unchanged — refresh wrapper only (binary skipped)
     install_script "$SCRIPT_DIR/scripts/zyvo" "$BIN_DIR/zyvo"
-    say "binary skip (delta) — wrapper refreshed"
+    say "binary skipped (delta) — wrapper refreshed"
 else
     if [ "$ENV_KIND" = "termux" ]; then
         spin "binary + libs install" install_core_termux \
-            || { tail -n 8 "$TMP/last.log" 2>/dev/null || true; fatal "core install fail." "installer abar chalao"; }
+            || { tail -n 8 "$TMP/last.log" 2>/dev/null || true; fatal "core install failed." "Rerun the installer"; }
     else
         spin "wrapper + branding install" install_core_official \
-            || { tail -n 8 "$TMP/last.log" 2>/dev/null || true; fatal "core install fail." "installer abar chalao"; }
+            || { tail -n 8 "$TMP/last.log" 2>/dev/null || true; fatal "core install failed." "Rerun the installer"; }
     fi
     [ -n "$LATEST_TAG" ] && echo "$LATEST_TAG" > "$CORE_STAMP" 2>/dev/null || true
     say "core installed → $LIBEXEC_DIR/opencode.bin"
@@ -512,10 +513,10 @@ except Exception:
 for k in ("username", "model", "small_model", "default_agent"):
     if k not in base and k in new:
         base[k] = new[k]
-# dead-model auto-fix: free list theke ling-3.0 sora feleche
+# dead-model auto-fix: ling-3.0 was dropped from the free list
 if "ling-3.0" in base.get("small_model", ""):
     base["small_model"] = new.get("small_model", "zyvo/laguna-s-2.1-free")
-# nemotron-3-ultra provider error dey — deepseek (stable default) e fire
+# nemotron-3-ultra reports provider errors — fall back to deepseek (stable default)
 if base.get("model", "").endswith("nemotron-3-ultra-free") and "model" in new:
     base["model"] = new["model"]
 base.setdefault("snapshot", False)
@@ -550,7 +551,7 @@ install_config() {
     [ -f "$SCRIPT_DIR/scripts/oc-settings.sh" ] && install_script "$SCRIPT_DIR/scripts/oc-settings.sh" "$BIN_DIR/oc-settings"
     return 0
 }
-spin "config + skills" install_config || warn "config copy e problem hoyeche"
+spin "config + skills" install_config || warn "there was a problem copying config"
 
 RC_FILE="$HOME/.bashrc"
 [ "$ENV_KIND" != "termux" ] && [ ! -f "$HOME/.bashrc" ] && [ -f "$HOME/.profile" ] && RC_FILE="$HOME/.profile"
@@ -581,9 +582,9 @@ if [ "$ENV_KIND" = "termux" ]; then
 fi
 OTHER_ZYVO="$(command -v zyvo 2>/dev/null || true)"
 if [ -n "$OTHER_ZYVO" ] && [ "$OTHER_ZYVO" != "$BIN_DIR/zyvo" ]; then
-    warn "onno path e o 'zyvo' ache: $OTHER_ZYVO — PATH check koro"
+    warn "another 'zyvo' exists at: $OTHER_ZYVO — check your PATH"
 fi
-VERSION="$("$BIN_DIR/zyvo" --version 2>&1)" || fatal "zyvo cholche na." "bash install.sh abar chalao"
+VERSION="$("$BIN_DIR/zyvo" --version 2>&1)" || fatal "zyvo is not running." "Rerun: bash install.sh"
 say "zyvo verified: $VERSION"
 step_ok
 
@@ -594,9 +595,9 @@ printf "  ${CYAN}╭────────────────────
 printf "  ${CYAN}│${RESET}  ${GREEN}${BOLD}⚡ ZYVO READY${RESET}                                ${CYAN}│${RESET}\n"
 printf "  ${CYAN}│${RESET}  ${DIM}%ss · %s/%s · %s${RESET}                     ${CYAN}│${RESET}\n" "$ELAPSED" "$ENV_KIND" "$ARCH" "$MODE"
 printf "  ${CYAN}├────────────────────────────────────────────┤${RESET}\n"
-printf "  ${CYAN}│${RESET}  ${BOLD}zyvo${RESET}                ${DIM}AI start (full-power)${RESET}   ${CYAN}│${RESET}\n"
-printf "  ${CYAN}│${RESET}  ${BOLD}zyvo session <naam>${RESET}  ${DIM}notun/resume session${RESET}    ${CYAN}│${RESET}\n"
-printf "  ${CYAN}│${RESET}  ${BOLD}zyvo update${RESET}          ${DIM}delta update check${RESET}       ${CYAN}│${RESET}\n"
+printf "  ${CYAN}│${RESET}  ${BOLD}zyvo${RESET}                ${DIM}start AI (full-power)${RESET}   ${CYAN}│${RESET}\n"
+printf "  ${CYAN}│${RESET}  ${BOLD}zyvo session <name>${RESET}  ${DIM}new/resume session${RESET}     ${CYAN}│${RESET}\n"
+printf "  ${CYAN}│${RESET}  ${BOLD}zyvo update${RESET}          ${DIM}delta update check${RESET}      ${CYAN}│${RESET}\n"
 printf "  ${CYAN}│${RESET}  ${BOLD}/dekho /fix /review /model /zyvo${RESET}          ${CYAN}│${RESET}\n"
 printf "  ${CYAN}│${RESET}  ${DIM}version: %s · %s commands · %s skills${RESET}      ${CYAN}│${RESET}\n" "$VERSION" "$N_CMD" "$N_SKILL"
 printf "  ${CYAN}╰────────────────────────────────────────────╯${RESET}\n"
@@ -604,4 +605,4 @@ if [ "$WARNINGS" -gt 0 ]; then
     printf "\n  ${YELLOW}${BOLD}%d warning:${RESET}" "$WARNINGS"
     printf "%b\n" "$SKIPPED"
 fi
-printf "\n  ${DIM}notun shell e:${RESET} source ~/.bashrc  ${DIM}tarpor${RESET} ${BOLD}zyvo${RESET}\n\n"
+printf "\n  ${DIM}in a new shell:${RESET} source ~/.bashrc  ${DIM}then${RESET} ${BOLD}zyvo${RESET}\n\n"

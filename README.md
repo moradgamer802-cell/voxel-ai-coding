@@ -1,5 +1,17 @@
 # ZYVO — OpenCode (Ready-to-Use AI Coding CLI)
 
+<div align="center">
+
+**AI coding CLI for Termux — native Android, zero config, free AI models**
+
+[![Platform](https://img.shields.io/badge/platform-Termux%20%7C%20Android%20%7C%20Linux%20%7C%20macOS-006a4e?style=flat-square&logo=linux)](https://github.com/zyvo9/zyvo-ai-coding)
+[![AI](https://img.shields.io/badge/AI-DeepSeek%20free-10a37f?style=flat-square&logo=openai)](https://opencode.ai/zen)
+[![Model](https://img.shields.io/badge/model-deepseek--v4--flash--free-0e7665?style=flat-square)](https://opencode.ai/zen)
+[![Setup](https://img.shields.io/badge/setup-zero%20config-f42a41?style=flat-square)](https://github.com/zyvo9/zyvo-ai-coding)
+[![License](https://img.shields.io/badge/license-MIT-8aa7a3?style=flat-square)](LICENSE)
+
+</div>
+
 ZYVO is a fully customized AI coding agent — **install and it just works**.
 Native Android build for Termux (no proot, no glibc), with automatic install
 on Ubuntu proot / Debian / Chromebook / WSL / macOS as well.

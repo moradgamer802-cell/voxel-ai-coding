@@ -1,18 +1,17 @@
 ---
 name: python-automation
-description: Python diye daily kaj automate — file organize, data process, CSV/Excel, scraping, bot. Use when user says "script banao", "kaj ta auto hoy", "file gulake organize koro", or wants automation.
+description: Automate daily tasks with Python — file organization, data processing, CSV/Excel, scraping, bots. Use when user says "write a script", "make this automatic", "organize these files", or wants automation.
 ---
 
 # Python Automation Skill
 
 ## Termux setup
-- `pkg install python` → `pip install <package>` cholbe
-- Termux storage: `/storage/emulated/0/` er file accesshte `termux-setup-storage`
-  age chalano thakte hobe
+- `pkg install python` → `pip install <package>` works
+- To access `/storage/emulated/0/` files, run `termux-setup-storage` first
 
 ## Common automation patterns
 
-### File organizer (Downloads saaf kora — khub common request)
+### File organizer (cleaning Downloads — very common request)
 ```python
 from pathlib import Path
 import shutil
@@ -27,27 +26,27 @@ for f in src.iterdir():
 ```
 
 ### CSV → Excel report (openpyxl), bulk rename, folder backup —
-same pattern: pathlib + shutil, dry-run first (`print` diye ki korbe dekhao),
-tarpor actual move.
+same pattern: pathlib + shutil, dry-run first (print what it will do),
+then the actual move.
 
 ### Web scraping (requests + beautifulsoup4)
-- Static page: requests + bs4
-- JS-rendered: playwright (Termux e heavy — desktop/proot bhalo)
-- **Ethics/Rules:** robots.txt respect, har request er majhe `time.sleep(1)`,
-  personal data scrape na, login-bypass na — public data only
+- Static pages: requests + bs4
+- JS-rendered: playwright (heavy on Termux — desktop/proot is better)
+- **Ethics/Rules:** respect robots.txt, `time.sleep(1)` between requests,
+  no personal data scraping, no login bypass — public data only
 
 ## Script quality rules
-- Har script e: `if __name__ == '__main__':` pattern
-- DRY-RUN flag: `python3 script.py --dry` — age dekhbe ki hobe, tarpor asol run
-- Log print: ki korche seta bolte thake (file count, skip count)
-- Error hole porer file e chole jay, crash na (`try/except` per-file)
-- Banglish comments + usage instructions docstring e
+- Every script: `if __name__ == '__main__':` pattern
+- DRY-RUN flag: `python3 script.py --dry` — shows what will happen before the real run
+- Log prints: say what it is doing (file count, skip count)
+- On errors, continue to the next file instead of crashing (`try/except` per-file)
+- English comments + usage instructions in the docstring
 
-## Scheduled run (Termux)
+## Scheduled runs (Termux)
 - `pkg install cronie termux-services` → crontab
-- Termux app background e thakte hobe (battery optimization off korte bolo)
-- Simple hole: `while True: ... time.sleep(3600)` script o cholbe
+- The Termux app must stay in the background (tell the user to disable battery optimization)
+- For simple cases, a `while True: ... time.sleep(3600)` script also works
 
 ## Deliver
-- Script file + kivabe chalabe (ek line Banglish)
-- Kono dangerous operation (delete/move) age confirm kore koro
+- The script file + how to run it (one line)
+- Confirm before any dangerous operation (delete/move)

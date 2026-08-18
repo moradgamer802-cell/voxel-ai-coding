@@ -1,14 +1,14 @@
 ---
-description: Code review kore — bug, problem, improvement suggestion dey.
+description: Review the code — bugs, problems, improvement suggestions.
 agent: build
 ---
 
-Review korbo: $ARGUMENTS
+Will review: $ARGUMENTS
 
-Check kor:
-1. Bug / logic error
-2. Security problem (SQL injection, XSS, secret leak, unsafe input)
-3. Performance issue
-4. Code style ar readability
+Check for:
+1. Bugs / logic errors
+2. Security problems (SQL injection, XSS, secret leak, unsafe input)
+3. Performance issues
+4. Code style and readability
 
-Protita problem er jonno: file path, line, ki problem, kemon fix korbo — Banglish e. Kono code change korbe na, shudhu review report dao.
+For each problem: file path, line, what the problem is, how to fix it — in English. Do not change any code, give a review report only.

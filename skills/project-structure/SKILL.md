@@ -1,13 +1,13 @@
 ---
 name: project-structure
-description: Clean, scalable project folder structure — notun project shuru korar age. Use when starting any new project or organizing existing one.
+description: Clean, scalable project folder structure — before starting a new project. Use when starting any new project or organizing an existing one.
 ---
 
 # Project Structure Skill (Full-Power)
 
-## Decision tree (age ei thako — user ke cross-question na)
-- 1-3 page simple site → **Flat HTML** (chotobelo!)
-- Multi-page site, kono build tool na → **HTML + css/ + js/**
+## Decision tree (decide this first — don't cross-question the user)
+- 1-3 page simple site → **Flat HTML** (fastest!)
+- Multi-page site, no build tool → **HTML + css/ + js/**
 - Interactive app → **React + Vite**
 - SEO-critical + full app → **Next.js**
 
@@ -16,10 +16,10 @@ description: Clean, scalable project folder structure — notun project shuru ko
 project/
 ├── index.html
 ├── about.html / contact.html ...
-├── css/style.css        # EKTA file — 3 ta css na
-├── js/main.js           # EKTA file
+├── css/style.css        # ONE file — not 3 css files
+├── js/main.js           # ONE file
 ├── assets/images/
-└── README.md            # kivabe chalabe (ek line)
+└── README.md            # how to run it (one line)
 ```
 
 ## React + Vite
@@ -27,7 +27,7 @@ project/
 project/
 ├── public/              # static (favicon, images)
 ├── src/
-│   ├── components/      # choto reusable (Navbar, Card)
+│   ├── components/      # small reusable (Navbar, Card)
 │   ├── pages/           # route-level
 │   ├── hooks/           # custom logic
 │   ├── lib/             # api calls, utils
@@ -51,7 +51,7 @@ project/
 ├── public/
 ├── types/
 ├── .env.local           # secrets (gitignored!)
-├── .env.example         # template — commit koro
+├── .env.example         # template — commit this
 └── package.json
 ```
 
@@ -66,9 +66,9 @@ project/
 ```
 
 ## Rules
-- Structure AGE banao — file banate giye folder bhabna na
-- `.` er modde file pile up na — related guloke folder e
-- Naam: lowercase-kebab (`user-profile/`) ba component PascalCase — ekta style
-- Har project e README (ek line: kivabe chalabe) + `.gitignore`
-- Data/output file source theke alada: `data/`, `output/` (gitignore output)
-- Deep nesting (4+ level) = structure signal bhenge — flatten koro
+- Set up the structure FIRST — don't invent folders while creating files
+- Don't pile files in `.` — group related files into folders
+- Names: lowercase-kebab (`user-profile/`) or PascalCase components — pick one style
+- Every project needs a README (one line: how to run) + `.gitignore`
+- Keep data/output separate from source: `data/`, `output/` (gitignore output)
+- Deep nesting (4+ levels) breaks structure signals — flatten it

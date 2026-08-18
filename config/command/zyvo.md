@@ -1,11 +1,11 @@
 ---
-description: ZYVO — ASCII banner print koro.
+description: Print the ZYVO ASCII banner.
 agent: build
 ---
 
-ZYVO banner dekhao. $ARGUMENTS
+Show the ZYVO banner. $ARGUMENTS
 
-1. ASCII art ta exactly print koro (code block e na):
+1. Print the ASCII art exactly (not in a code block):
 ```
 ██╗    ██╗ ██████╗  ██╗  ██╗ ███████╗ ██╗
 ██║    ██║ ██╔══██╗ ╚██╗██╔╝ ██╔════╝ ██║
@@ -14,5 +14,5 @@ ZYVO banner dekhao. $ARGUMENTS
  ╚██████╔╝ ╚██████╔╝ ██╔╝ ██╗ ███████╔╝ ███████╗
   ╚═══╝   ╚═════╝ ╚═╝  ╚═╝ ╚══════╝ ╚══════╝
 ```
-2. Tarpor kichhu bolo — ZYVO kemon kaj kore (AI coding CLI for Termux, free zen model).
-3. Session er kotha o bolo ek line e: `zyvo session <naam>` diye alada alada session e kaj kora jay (zyvo/<naam>/ folder — chat history auto-resume), `zyvo session` diye list.
+2. Then say a few words — how ZYVO works (AI coding CLI for Termux, free zen model).
+3. Mention sessions in one line: `zyvo session <name>` lets you work in separate sessions (zyvo/<name>/ folder — chat history auto-resumes), `zyvo session` lists them.

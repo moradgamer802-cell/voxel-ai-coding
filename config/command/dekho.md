@@ -1,14 +1,14 @@
 ---
-description: Project er structure explain kore — kotay ki ache, ki kore chole.
+description: Explain the project structure — what is where, how it works.
 agent: build
 ---
 
-Ekhon er project ta explore kore bujho. $ARGUMENTS
+Explore and understand the current project. $ARGUMENTS
 
-Dekhao:
-1. Project er overall structure (main folder ar file gula ki)
-2. Entry point kothay (main file, index, app start hoy kothay)
-3. Main features gula kotay implement hoyeche
-4. Amon kichu ache jeta user jane na — surprising/dangerous kichu
+Show:
+1. The overall project structure (main folders and files)
+2. Where the entry point is (main file, index, where the app starts)
+3. Where the main features are implemented
+4. Anything the user probably does not know — surprising or dangerous things
 
-Shob Banglish e explain koro, file path ar code English e rakho. Kono file change korbe na — shudhu explain korbe.
+Explain everything in English, keep file paths and code in their original form. Do not change any files — explain only.

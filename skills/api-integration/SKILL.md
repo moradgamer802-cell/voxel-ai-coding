@@ -1,16 +1,16 @@
 ---
 name: api-integration
-description: API diye kaj — fetch data, third-party service jora, weather/payment/news site e data. Use when user wants live data, API call, or "internet theke information ano".
+description: Work with APIs — fetch data, connect third-party services, live data for weather/payment/news sites. Use when user wants live data, API calls, or information from the internet.
 ---
 
 # API Integration Skill
 
 ## Rules (strict)
-- **API key kokhono code e hardcode na** — `.env` file e rakhho,
-  `.env.example` template dao, `.env` gitignore e
-- Frontend e sensitive key rakhle seta PUBLIC — sobai dekhte pare.
-  Paid/secret key lagbe hole bolo: backend/serverless lagbe
-- Free API age check koro (websearch) — current status, rate limit
+- **Never hardcode API keys in code** — keep them in a `.env` file,
+  provide an `.env.example` template, and gitignore `.env`
+- A sensitive key in frontend code is PUBLIC — everyone can see it.
+  For paid/secret keys, say it: a backend/serverless layer is needed
+- Check free APIs first (websearch) — current status, rate limits
 
 ## Fetch pattern (vanilla JS — modern)
 ```js
@@ -21,29 +21,29 @@ async function loadData() {
     const data = await res.json();
     render(data);
   } catch (err) {
-    showMsg('Data ashte problem hocche — internet check koro'); // user-facing
-    console.error(err); // debug er jonno
+    showMsg('There was a problem loading the data — check your internet'); // user-facing
+    console.error(err); // for debugging
   }
 }
 ```
-- Loading state MUST (spinner/skeleton) — blank screen beginner user ke daray
-- Error hole human message — beginner user ke "404" na, "Data pawa jayni"
+- Loading state is MANDATORY (spinner/skeleton) — a blank screen stops beginner users
+- Human error messages — not "404" for a beginner, but "Data could not be loaded"
 
 ## CORS (common blocker)
-- Browser e direct call fail + console e CORS error → API ta browser allow
-  kore na. Solutions: (1) API er official CORS-enabled endpoint, (2) nijer
-  server proxy, (3) onno API
-- API key wala public site e: AllOrigins/corsproxy type public proxy use koro
-  (free, kintu sensitive key er sathe NA)
+- Direct browser call fails + CORS error in console → the API does not allow
+  the browser. Solutions: (1) the API's official CORS-enabled endpoint,
+  (2) your own server proxy, (3) a different API
+- Public sites with API keys: use AllOrigins/corsproxy-type public proxies
+  (free, but NEVER with sensitive keys)
 
-## Useful free API scene (BD context)
-- Weather: Open-Meteo (key lagbe na, lat/lon diye)
-- Prayer time: Aladhan API (city diye)
-- Currency rate: exchangerate/frankfurter
-- News/search: user er jei service, docs poro age
+## Useful free APIs
+- Weather: Open-Meteo (no key needed, uses lat/lon)
+- Prayer times: Aladhan API (by city)
+- Currency rates: exchangerate / frankfurter
+- News/search: whatever service the user has — read its docs first
 
 ## Workflow
-1. API docs poro (webfetch) — endpoint, params, auth, rate limit
-2. Choto test: ek call, response structure dekho
-3. UI te data bind + loading + error + empty state
-4. Rate limit respect koro — har call e cache (localStorage expire time soho)
+1. Read the API docs (webfetch) — endpoint, params, auth, rate limit
+2. Small test: one call, look at the response structure
+3. Bind data in the UI + loading + error + empty states
+4. Respect rate limits — cache every call (localStorage with expiry)

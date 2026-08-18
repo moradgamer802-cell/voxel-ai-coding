@@ -1,38 +1,38 @@
 ---
 name: bash-cli-expert
-description: Safe, clean, efficient bash/CLI — Termux/Linux command banano, pipes, quoting, one-liners. Use whenever running or writing any shell command or script.
+description: Safe, clean, efficient bash/CLI — Termux/Linux commands, pipes, quoting, one-liners. Use whenever running or writing any shell command or script.
 ---
 
 # Bash / CLI Expert Skill (Full-Power)
 
-## Termux reality (user er phone e cholbe)
-- Paths: `/storage/emulated/0/` = shared storage (FUSE — slow, case-sensitive-ish
-  per backend), `$HOME` = fast private storage
-- Heavy IO shared storage e bhalo na — copy to $HOME, kaj sesh e copy back
-- `pkg install <x>` = apt wrapper; `termux-open <file>` diye file default app e khule
-- Android 11+ e `/sdcard` symlink o kaj kore; na thakle `/storage/emulated/0`
+## Termux reality (it runs on the user's phone)
+- Paths: `/storage/emulated/0/` = shared storage (FUSE — slow, case-sensitivity
+  depends on the backend), `$HOME` = fast private storage
+- Heavy IO on shared storage is bad — copy to $HOME, work, copy back when done
+- `pkg install <x>` = apt wrapper; `termux-open <file>` opens a file in its default app
+- On Android 11+ the `/sdcard` symlink also works; otherwise use `/storage/emulated/0`
 
-## Safety gates (always — auto-approve er karone AI nije guard)
-- Read-only age: `ls`, `file`, `grep -n`, `find ... -maxdepth 2`
-- `rm -rf` — exact absolute path, variable empty hole `set -u` e atko; `/` ba
-  `$HOME` kkhono target na
-- `curl | sh` — user explicitly na chaile na
-- `mv` overwrite korbe — age `[ -f dest ]` check
-- Destructive hole age bolo ki korbe, tarpor koro
+## Safety gates (always — the AI guards itself because of auto-approve)
+- Read-only first: `ls`, `file`, `grep -n`, `find ... -maxdepth 2`
+- `rm -rf` — exact absolute path, stop on empty variables (`set -u`); never target
+  `/` or `$HOME`
+- `curl | sh` — only if the user explicitly asked
+- `mv` will overwrite — check `[ -f dest ]` first
+- If destructive, say what you will do first, then do it
 
 ## Command hygiene
-- Ek command ek kaj; `&&` chain korba jokhon porer step ager er upor nirbhor
-- Script e: `set -eu` + `trap 'rm -f "$TMP"' EXIT` temp file er jonno
-- `curl`/`git`/`pkg install` er por exit check: `cmd || { echo fail; exit 1; }`
-- Long task: `timeout 60 cmd` — hang protection
-- JSON edit: `python3 - <<'PY'` heredoc — fragile sed/awk regex na
-- Search: `rg` (fast, git-aware) — recursive grep er cheye
+- One command does one thing; chain with `&&` only when the next step depends on the previous
+- In scripts: `set -eu` + `trap 'rm -f "$TMP"' EXIT` for temp files
+- After `curl`/`git`/`pkg install`: check exit — `cmd || { echo fail; exit 1; }`
+- Long tasks: `timeout 60 cmd` — hang protection
+- JSON edits: `python3 - <<'PY'` heredoc — no fragile sed/awk regex
+- Search: `rg` (fast, git-aware) — better than recursive grep
 
 ## Patterns (power one-liners)
 ```sh
-# folder size rank
+# folder size ranking
 du -sh */ | sort -h
-# batch rename (safe preview age)
+# batch rename (safe preview first)
 for f in *.JPG; do mv "$f" "${f%.JPG}.jpg"; done
 # find + action, space-safe
 find . -name "*.log" -print0 | xargs -0 rm
@@ -43,6 +43,6 @@ tar -xf x.tar.gz / unzip -q x.zip
 ```
 
 ## Verification
-- Change er por: abar chalao ba `$?` check
-- Config edit: `cp x x.bak` age, `diff x.bak x` porer
-- Script deliver korle: ekbar test run koro, tarpor user ke usage line dao
+- After changes: run again or check `$?`
+- Config edits: `cp x x.bak` first, then `diff x.bak x`
+- When delivering a script: test-run it once, then give the user the usage line
