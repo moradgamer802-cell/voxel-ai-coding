@@ -1,0 +1,212 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# zyvo — wrapper that disables Android bionic TBI heap pointer tagging
+#
+# The real zyvo binary is zyvo.bin; this script LD_PRELOAD's libtagfix.so
+# (a constructor that calls mallopt to turn off heap tagging) before exec'ing it.
+# Without this, Bun/JSC's NaN-boxing clears the 0xB4 top-byte tag on heap
+# pointers, causing bionic to SIGABRT on free(): "Pointer tag ... was truncated".
+#
+# Permission system: none — everything is allowed by config (beginner CLI
+# design, no prompts). The wrapper does not enforce any permissions.
+#
+# Named sessions: zyvo session <name> — opens <base>/zyvo/<name>/ and
+# resumes the previous chat history with --continue. zyvo session = list.
+#
+# Path resolution order (supports both standalone zip and installed package):
+#   zip:      wrapper, zyvo.bin, libtagfix.so all live in the same dir
+#   installed: bin/zyvo, libexec/opencode/zyvo.bin, lib/libtagfix.so
+#   glibc Linux (Ubuntu proot etc.): ~/.local/bin/zyvo, ~/.local/libexec/zyvo/
+
+set -e
+
+dir="$(cd "$(dirname "$0")" && pwd)"
+export ANDROID_ROOT="${ANDROID_ROOT:-/system}"
+export TERMUX_VERSION="${TERMUX_VERSION:-zyvo-termux}"
+export TMPDIR="${ZYVO_TMPDIR:-${HOME:-/data/data/com.termux/files/home}/tmp}"
+export TEMP="$TMPDIR"
+export TMP="$TMPDIR"
+export OPENCODE_DISABLE_TUI_AUDIO="${OPENCODE_DISABLE_TUI_AUDIO:-1}"
+mkdir -p "$TMPDIR" 2>/dev/null || true
+
+# ---- zyvo update: reruns the delta installer ----
+# (if the core is unchanged it is 0 MB — only the ZYVO layer refreshes)
+if [ "${1:-}" = "update" ] || [ "${1:-}" = "upgrade" ]; then
+    shift
+    echo "zyvo: checking for updates (delta — 0 MB if the core is unchanged)"
+    UPDATER_URL="https://raw.githubusercontent.com/zyvo9/zyvo/main/install.sh"
+    if curl -fsSL --retry 3 --connect-timeout 15 --max-time 120 -o "$TMPDIR/zyvo-update.sh" "$UPDATER_URL" 2>/dev/null; then
+        exec sh "$TMPDIR/zyvo-update.sh" "$@"
+    fi
+    echo "zyvo: could not fetch the update script — check your internet" >&2
+    exit 1
+fi
+
+# ---- zyvo uninstall: removes ZYVO cleanly (needs the repo script) ----
+if [ "${1:-}" = "uninstall" ]; then
+    shift
+    UNINSTALLER_URL="https://raw.githubusercontent.com/zyvo9/zyvo/main/scripts/zyvo-uninstall"
+    UNINSTALLER=""
+    # prefer a local copy (installed layout), else the current repo
+    for c in "$dir/../share/zyvo/scripts/zyvo-uninstall" "$dir/zyvo-uninstall" "$TMPDIR/zyvo-uninstall"; do
+        if [ -f "$c" ]; then UNINSTALLER="$c"; break; fi
+    done
+    if [ -z "$UNINSTALLER" ]; then
+        if curl -fsSL --retry 2 --connect-timeout 15 --max-time 60 -o "$TMPDIR/zyvo-uninstall" "$UNINSTALLER_URL" 2>/dev/null; then
+            UNINSTALLER="$TMPDIR/zyvo-uninstall"
+        fi
+    fi
+    if [ -n "$UNINSTALLER" ]; then
+        exec sh "$UNINSTALLER" "$@"
+    fi
+    echo "zyvo: could not fetch the uninstaller — check your internet" >&2
+    exit 1
+fi
+
+# ---- zyvo preview <dir>: local server + open in the default browser ----
+# Browsers block scripts/fetch/CSS on file:// URLs, so HTML opened directly
+# from the file manager often shows a blank page. Serving over http:// fixes it.
+if [ "${1:-}" = "preview" ] || [ "${1:-}" = "open" ]; then
+    PREVIEW_DIR="${2:-$PWD}"
+    [ -d "$PREVIEW_DIR" ] || { echo "zyvo: no such folder: $PREVIEW_DIR" >&2; exit 1; }
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "zyvo: python3 is required for the local server — install it (pkg install python)" >&2
+        exit 1
+    fi
+    PORT="${ZYVO_PREVIEW_PORT:-8080}"
+    echo "zyvo: serving $PREVIEW_DIR → http://localhost:$PORT"
+    echo "      (opens automatically; Ctrl+C stops the server)"
+    ( sleep 1.5; command -v termux-open-url >/dev/null 2>&1 \
+        && termux-open-url "http://localhost:$PORT/" \
+        || command -v xdg-open >/dev/null 2>&1 && xdg-open "http://localhost:$PORT/" ) &
+    cd "$PREVIEW_DIR" || exit 1
+    exec python3 -m http.server "$PORT" --bind 127.0.0.1
+fi
+
+# ---- args: named session (legacy permission flags silently ignored) ----
+SESSION_MODE=0
+SESSION_NAME=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --yolo|-y|--safe|--ask) shift; continue;;
+        session|sessions)
+            SESSION_MODE=1; shift
+            [ "$#" -gt 0 ] && { SESSION_NAME="$1"; shift; }
+            break;;
+        *) break;;
+    esac
+done
+
+# ---- workspace resolve ----
+# The default workspace and named sessions live on top of the shared
+# storage base (falling back to home). The storage root holds thousands of
+# files (DCIM, WhatsApp, Android/) — working there again makes the phone
+# lag and heat up. A fresh dedicated folder = light + fast.
+WS_BASE=""
+if [ -d /storage/emulated/0 ]; then WS_BASE=/storage/emulated/0
+elif [ -d /sdcard ]; then WS_BASE=/sdcard
+fi
+if [ "$SESSION_MODE" = 1 ]; then
+    # Named session = its own folder inside the zyvo/ folder:
+    #   /storage/emulated/0/zyvo/<name>/
+    SDIR_ROOT="${WS_BASE:-$HOME}/zyvo"
+    if [ -z "$SESSION_NAME" ]; then
+        SESS_TMP="$TMPDIR/zyvo-session-list"
+        : > "$SESS_TMP" 2>/dev/null || true
+        if [ -d "$SDIR_ROOT" ]; then
+            ls -1t "$SDIR_ROOT" 2>/dev/null | while read -r d; do
+                [ -n "$d" ] && [ -d "$SDIR_ROOT/$d" ] && printf '%s\n' "$d" >> "$SESS_TMP"
+            done
+        fi
+        echo "ZYVO sessions ($SDIR_ROOT):"
+        if [ -s "$SESS_TMP" ]; then sed 's/^/  /' "$SESS_TMP"
+        else echo "  (empty — create one with: zyvo session <name>)"; fi
+        rm -f "$SESS_TMP" 2>/dev/null || true
+        echo "Open/new: zyvo session <name>"
+        exit 0
+    fi
+    case "$SESSION_NAME" in
+        ""|"."|".."|*[!A-Za-z0-9._-]*)
+            echo "zyvo: session names may only contain a-z 0-9 . _ - (no spaces/symbols)" >&2
+            exit 1;;
+    esac
+    SDIR="$SDIR_ROOT/$SESSION_NAME"
+    if mkdir -p "$SDIR" 2>/dev/null && [ -d "$SDIR" ]; then
+        cd "$SDIR"
+        export OPENCODE_DEFAULT_DIR="$SDIR"
+    else
+        echo "zyvo: could not create session folder ($SDIR)" >&2
+        exit 1
+    fi
+elif [ "$#" -eq 0 ] && [ "$PWD" = "$HOME" ]; then
+    # Default workspace: dedicated folder (not the storage root), only
+    # when launching from home without a directory argument.
+    if [ -n "$WS_BASE" ]; then
+        if mkdir -p "$WS_BASE/zyvo" 2>/dev/null && [ -d "$WS_BASE/zyvo" ]; then
+            cd "$WS_BASE/zyvo"
+            export OPENCODE_DEFAULT_DIR="$WS_BASE/zyvo"
+        else
+            cd "$WS_BASE"
+            export OPENCODE_DEFAULT_DIR="$WS_BASE"
+        fi
+    fi
+fi
+
+# Set the terminal title so the toolbar shows ZYVO
+if ( : >/dev/tty ) 2>/dev/null; then printf '\033]0;ZYVO\007' >/dev/tty 2>/dev/null; fi
+
+# Locate the native libraries we ship alongside the wrapper.
+# In the flat layout they sit next to the wrapper; in the Termux package
+# layout they are under ../lib; on glibc Linux under ~/.local/lib/zyvo.
+NATIVE_LIB_DIR=""
+for candidate in \
+    "$dir/../lib" \
+    "${PREFIX:-/data/data/com.termux/files/usr}/lib" \
+    "$HOME/.local/lib/zyvo" \
+    "$dir"
+do
+    if [ -f "$candidate/libtagfix.so" ]; then
+        NATIVE_LIB_DIR="$candidate"
+        break
+    fi
+done
+
+if [ -n "$NATIVE_LIB_DIR" ]; then
+    export LD_PRELOAD="${NATIVE_LIB_DIR}/libtagfix.so${LD_PRELOAD:+:$LD_PRELOAD}"
+    export LD_LIBRARY_PATH="${NATIVE_LIB_DIR}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    export OPENTUI_LIB_PATH="${NATIVE_LIB_DIR}/libopentui.so"
+    if [ -f "${NATIVE_LIB_DIR}/librust_pty_arm64.so" ]; then
+        export BUN_PTY_LIB="${NATIVE_LIB_DIR}/librust_pty_arm64.so"
+    fi
+    export OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER="${OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER:-true}"
+    if [ -x "$NATIVE_LIB_DIR/bun" ]; then
+        export OPENCODE_BUN_PATH="$NATIVE_LIB_DIR/bun"
+    fi
+elif [ -n "$PREFIX" ] && [ -d "$PREFIX" ]; then
+    # warn only on real Termux — glibc Linux does not need the native lib
+    echo "zyvo: warning: native library directory not found, may crash on Android 11+" >&2
+fi
+
+# Locate the real binary. Prefer the package layout first so upgrades do not
+# accidentally execute a stale flat-layout binary left in $PREFIX/bin.
+BIN=""
+for candidate in \
+    "$dir/../libexec/opencode/opencode.bin" \
+    "$HOME/.local/libexec/zyvo/opencode.bin" \
+    "${PREFIX:-/data/data/com.termux/files/usr}/libexec/opencode/opencode.bin" \
+    "$dir/opencode.bin" \
+    "$HOME/.opencode/bin/opencode"
+do
+    if [ -x "$candidate" ]; then
+        BIN="$candidate"
+        break
+    fi
+done
+[ -n "$BIN" ] || { echo "zyvo: error: could not find opencode.bin" >&2; exit 127; }
+
+rc=0
+if [ "$SESSION_MODE" = 1 ]; then
+    "$BIN" --continue "$@" || rc=$?
+else
+    "$BIN" "$@" || rc=$?
+fi
+exit $rc

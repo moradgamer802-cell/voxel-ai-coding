@@ -1,0 +1,41 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "username": "deshi-dev",
+  "provider": {
+    "zyvo": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Zyvo (Zen)",
+      "options": {
+        "baseURL": "https://opencode.ai/zen/v1",
+        "apiKey": "{env:OPENCODE_API_KEY}"
+      }
+    }
+  },
+  "model": "zyvo/deepseek-v4-flash-free",
+  "small_model": "zyvo/laguna-s-2.1-free",
+  "default_agent": "build",
+  "snapshot": false,
+  "autoupdate": false,
+  "share": "disabled",
+  "watcher": {
+    "ignore": [
+      "Android/**",
+      "DCIM/**",
+      "Pictures/**",
+      "Movies/**",
+      "Music/**",
+      "WhatsApp/**",
+      "Download/**",
+      "**/node_modules/**",
+      "**/.git/**"
+    ]
+  },
+  "permission": {
+    "bash": "allow",
+    "edit": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "external_directory": "allow",
+    "doom_loop": "allow"
+  }
+}

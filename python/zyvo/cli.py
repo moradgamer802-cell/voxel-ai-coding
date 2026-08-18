@@ -1,35 +1,43 @@
 """zyvo — command-line bootstrap for installing ZYVO from PyPI.
 
-`pip install zyvo` gives you the `zyvo` command. Running it (or
-`zyvo install`) streams the ZYVO layer from the GitHub repo into
-~/.local/zyvo/boot/, then hands over to the real installer, which
-downloads the core engine with a single live progress line.
+`pip install zyvo` gives you the `zyvo` command. Running it installs
+the ZYVO layer (scripts + config + skills + installer) from the wheel's
+own bundled copy — no network fetch for the layer — then hands over to
+the real installer, which downloads the core engine with a single live
+progress line.
 
-Design: the pip package stays a tiny launcher — all real logic lives in
-install.sh, so curl-install and pip-install always behave identically.
+Design: the pip package bundles the layer and acts as the launcher;
+all real logic lives in install.sh, so curl-install and pip-install
+behave identically (pip just skips the layer download).
 """
 
 import argparse
 import os
 import shutil
-import ssl
 import subprocess
 import sys
 import tarfile
 import tempfile
-import urllib.request
 
 from . import __version__
 
-GH_REPO = os.environ.get("GH_REPO", "zyvo9/zyvo")
-TARBALL_URL = "https://codeload.github.com/{repo}/tar.gz/refs/heads/main"
+# bundled layer lives inside the installed package (setuptools package-data)
+_LAYER_SRC = os.path.join(os.path.dirname(__file__), "layer")
 BOOT_DIR = os.path.join(os.path.expanduser("~"), ".local", "zyvo", "boot")
+
+
+def _extract_layer(dest):
+    """Copy the bundled layer into dest (keeps file modes via copytree)."""
+    os.makedirs(dest, exist_ok=True)
+    for entry in os.listdir(_LAYER_SRC):
+        src = os.path.join(_LAYER_SRC, entry)
+        shutil.copy2(src, dest, follow_symlinks=True) if os.path.isfile(src) else shutil.copytree(
+            src, os.path.join(dest, entry), dirs_exist_ok=True
+        )
 
 
 def _jump_to_installer(boot):
     """Run the real installer with the boot layer as the layer source."""
-    # the installer lives at the repo root; a boot copy also keeps the
-    # layout intact (scripts/ exists only for the wrapper scripts)
     installer = os.path.join(boot, "install.sh")
     if not os.path.isfile(installer):
         sys.exit(
@@ -41,27 +49,6 @@ def _jump_to_installer(boot):
     env = dict(os.environ, ZYVO_BOOT=boot)
     print("\nzyvo: layer ready — starting the core installer…\n")
     sys.exit(subprocess.call(["sh", installer], env=env))
-
-
-def _download_layer(dest):
-    """Stream the repo tarball into dest (three-way untar, no temp full copy)."""
-    ctx = ssl.create_default_context()
-    url = TARBALL_URL.format(repo=GH_REPO)
-    print("zyvo: fetching zyvo layer ({})".format(url))
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "zyvo-pip"})
-        with urllib.request.urlopen(req, timeout=60, context=ctx) as resp:
-            with tarfile.open(fileobj=resp, mode="r|gz") as tar:
-                # strip the top-level folder: repo-main/
-                for member in tar:
-                    parts = member.name.split("/", 1)
-                    if len(parts) == 2:
-                        member.name = parts[1]
-                        if member.name:
-                            tar.extract(member, dest)
-    except Exception as e:  # network, tar, ssl
-        shutil.rmtree(dest, ignore_errors=True)
-        sys.exit("error: could not download the zyvo layer: {}".format(e))
 
 
 def _configure_rc():
@@ -88,9 +75,8 @@ def cmd_install(args):
         _jump_to_installer(BOOT_DIR)
         return 0
     shutil.rmtree(BOOT_DIR, ignore_errors=True)
-    os.makedirs(BOOT_DIR, exist_ok=True)
-    print("zyvo: preparing layer in {}".format(BOOT_DIR))
-    _download_layer(BOOT_DIR)
+    print("zyvo: writing layer to {}".format(BOOT_DIR))
+    _extract_layer(BOOT_DIR)
     _configure_rc()
     _jump_to_installer(BOOT_DIR)
     return 0

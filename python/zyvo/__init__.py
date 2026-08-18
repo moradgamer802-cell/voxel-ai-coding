@@ -1,9 +1,9 @@
 """ZYVO — ready-to-use AI coding CLI (OpenCode) for Termux.
 
-This pip package is a thin bootstrap: it downloads the ZYVO layer
-(scripts + config + skills) from the GitHub repo, unpacks it, then
-hands over to the real installer (scripts/install.sh) which does
-everything else (core engine, deps, single-line live progress).
+This pip package bundles the full ZYVO layer (scripts + config +
+skills + installer). Running `zyvo` unpacks the layer locally and
+hands over to the real installer (install.sh) which does everything
+else (core engine, deps, single-line live progress).
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
