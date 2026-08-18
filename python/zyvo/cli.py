@@ -70,10 +70,10 @@ def _configure_rc():
 
 
 def cmd_install(args):
+    # always refresh: a stale boot layer (older install.sh) must never
+    # survive an upgrade — wipe and re-extract every run (180KB, instant)
     if os.path.isfile(os.path.join(BOOT_DIR, "install.sh")):
-        print("zyvo: layer already installed — starting the core installer…")
-        _jump_to_installer(BOOT_DIR)
-        return 0
+        print("zyvo: refreshing layer ({} → {})".format("old", __version__))
     shutil.rmtree(BOOT_DIR, ignore_errors=True)
     print("zyvo: writing layer to {}".format(BOOT_DIR))
     _extract_layer(BOOT_DIR)
