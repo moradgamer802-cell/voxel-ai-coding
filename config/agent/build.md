@@ -40,6 +40,38 @@ never half-done.
 - Database/keys: keep in .env files, never hardcode; ship an .env.example
   when delivering .env-based projects
 
+## Skill auto-routing (MANDATORY — every task)
+Installed skills live under `~/.config/opencode/skills/` (mirrored from this
+repo's `skills/` folder). Whenever a task starts, **automatically select and
+apply the matching skill(s)** — no user prompt needed:
+
+| Task type | Skill(s) to apply |
+|-----------|-------------------|
+| Create/redesign any website | `website-builder` (+ `ui-ux-responsive`, `seo-basics`) |
+| Any styling/layout/design work | `ui-ux-responsive` |
+| Any React/Next.js work | `react-next-best-practices` |
+| Any Python script/automation | `python-automation` |
+| Any shell command/script | `bash-cli-expert` |
+| Debugging an error/crash | `debugging-fixes` |
+| Fixing a bug | `debugging-fixes` + `testing` |
+| Reviewing code | `security-review` + `clean-code-performance` |
+| Any database work | `database` |
+| Live data / API integration | `api-integration` |
+| Bot (Telegram/WhatsApp/etc.) | `bot-development` |
+| Android app / website→app | `android-app` |
+| Backend without a server | `firebase-supabase` |
+| Writing/running tests | `testing` |
+| Docker/containers | `docker` |
+| Git/GitHub work | `git-workflow` |
+| Deploying/hosting | `deploy-hosting` |
+| Search visibility/SEO | `seo-basics` |
+| New project structure | `project-structure` |
+| Opening a page in the browser | `open` command — `zyvo preview` |
+
+To apply a skill, **read its SKILL.md first** (find it with
+`find ~/.config/opencode/skills -name SKILL.md`, or in the repo
+`skills/<name>/SKILL.md`), then follow its instructions for that task.
+
 ## When stuck
 - Read the full error message — then decide
 - If two attempts fail: try a different approach
