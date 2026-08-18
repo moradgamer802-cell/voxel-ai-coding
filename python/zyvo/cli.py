@@ -16,8 +16,6 @@ import os
 import shutil
 import subprocess
 import sys
-import tarfile
-import tempfile
 
 from . import __version__
 
@@ -46,9 +44,11 @@ def _jump_to_installer(boot):
         )
     if not os.access(installer, os.X_OK):
         os.chmod(installer, 0o755)
+    # prefer bash when available (install.sh animates; POSIX sh works too)
+    shell = "bash" if shutil.which("bash") else "sh"
     env = dict(os.environ, ZYVO_BOOT=boot)
     print("\nzyvo: layer ready — starting the core installer…\n")
-    sys.exit(subprocess.call(["sh", installer], env=env))
+    sys.exit(subprocess.call([shell, installer], env=env))
 
 
 def _configure_rc():

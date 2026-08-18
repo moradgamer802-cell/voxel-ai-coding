@@ -82,15 +82,22 @@ run_bg() { # <label> <cmd...> — run in background, animate the status line
     local label="$1"; shift
     "$@" >> "$LOG" 2>&1 &
     local pid=$! i=0
-    local frames='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
     while kill -0 "$pid" 2>/dev/null; do
         i=$(( (i % 10) + 1 ))
-        STATUS="$label ${frames:$((i-1)):1}"
+        STATUS="$label $(spinner "$i")"
         draw; sleep 0.12
     done
     wait "$pid" || return 1
     STATUS="$label"
     draw
+}
+
+spinner() { # <tick 1-10> -> braille frame (POSIX sh compatible)
+    case $(( $1 % 10 )) in
+        1) printf '⠋';; 2) printf '⠙';; 3) printf '⠹';; 4) printf '⠸';;
+        5) printf '⠼';; 6) printf '⠴';; 7) printf '⠦';; 8) printf '⠧';;
+        9) printf '⠇';; *) printf '⠏';;
+    esac
 }
 
 download_file() { # <url> <out> <label> — live %, MB + speed on the same line
