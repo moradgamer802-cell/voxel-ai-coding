@@ -11,6 +11,7 @@
 #
 # Named sessions: zyvo session <name> — opens <base>/zyvo/<name>/ and
 # resumes the previous chat history with --continue. zyvo session = list.
+# zyvo menu = interactive menu; zyvo session <number> = resume that one.
 #
 # Path resolution order (supports both standalone zip and installed package):
 #   zip:      wrapper, zyvo.bin, libtagfix.so all live in the same dir
@@ -62,7 +63,101 @@ if [ "${1:-}" = "uninstall" ]; then
     exit 1
 fi
 
-# ---- zyvo preview <dir>: local server + open in the default browser ----
+# ---- zyvo doctor: quick health check + auto-fix ----
+if [ "${1:-}" = "doctor" ]; then
+    echo "ZYVO doctor — checking..."; echo
+    ISSUES=0
+    # 1) wrapper
+    if [ -f "$dir/zyvo" ] || [ -x "$dir/zyvo" ]; then echo "  ✓ wrapper: $dir/zyvo"
+    else echo "  ✗ wrapper missing"; ISSUES=$((ISSUES+1)); fi
+    # 2) config dir
+    CFG="$HOME/.config/opencode"
+    if [ -f "$CFG/opencode.json" ]; then
+        # model line (works without python too)
+        if grep -q 'deepseek-v4-flash-free' "$CFG/opencode.json" 2>/dev/null; then
+            echo "  ✓ model: deepseek-v4-flash-free (default)"
+        else
+            echo "  ✗ model is NOT deepseek-v4-flash-free — fix with: zyvo update"
+            ISSUES=$((ISSUES+1))
+        fi
+    else
+        echo "  ✗ config not found ($CFG) — run: zyvo"
+        ISSUES=$((ISSUES+1))
+    fi
+    # 3) core binary
+    CORE=""
+    for c in "$dir/../libexec/opencode/opencode.bin" "$HOME/.local/libexec/zyvo/opencode.bin" "${PREFIX:-/data/data/com.termux/files/usr}/libexec/opencode/opencode.bin" "$dir/opencode.bin" "$HOME/.opencode/bin/opencode"; do
+        [ -x "$c" ] && { CORE="$c"; break; }
+    done
+    if [ -n "$CORE" ]; then echo "  ✓ core engine: $CORE"
+    else echo "  ✗ core engine missing — run: zyvo"; ISSUES=$((ISSUES+1)); fi
+    # 4) version stamp
+    STAMP=""
+    for s in "$dir/../libexec/opencode/zyvo-core-version" "$HOME/.local/libexec/zyvo/zyvo-core-version" "${PREFIX:-/data/data/com.termux/files/usr}/libexec/opencode/zyvo-core-version"; do
+        [ -f "$s" ] && { STAMP="$(cat "$s" 2>/dev/null)"; break; }
+    done
+    if [ -n "$STAMP" ]; then echo "  ✓ core version: $STAMP"
+    else echo "  ✓ core version: (no stamp — will update on next run)"; fi
+    # 5) native lib
+    NATIVE=""
+    for n in "$dir/../lib" "${PREFIX:-/data/data/com.termux/files/usr}/lib" "$HOME/.local/lib/zyvo" "$dir"; do
+        [ -f "$n/libtagfix.so" ] && { NATIVE="$n"; break; }
+    done
+    if [ -n "$NATIVE" ]; then echo "  ✓ native libs: $NATIVE/libtagfix.so"
+    else echo "  ⚠ native libs not found (may crash on Android 11+; Linux is fine)"; fi
+    # 6) api key in rc
+    rc="$HOME/.bashrc"
+    if grep -q 'OPENCODE_API_KEY' "$rc" 2>/dev/null || [ -n "$OPENCODE_API_KEY" ]; then
+        echo "  ✓ API key configured"
+    else
+        echo "  ✗ API key not set — add to $rc (or export OPENCODE_API_KEY)"
+        ISSUES=$((ISSUES+1))
+    fi
+    echo
+    if [ "$ISSUES" -eq 0 ]; then
+        echo "  ✅ All good — ZYVO is ready."
+    else
+        echo "  ⚠ $ISSUES issue(s) found — fix with: zyvo update  (or rerun: zyvo)"
+    fi
+    exit 0
+fi
+
+# ---- zyvo backup: everything into one .tar.gz ----
+if [ "${1:-}" = "backup" ]; then
+    shift
+    DEST="${1:-$PWD}"
+    [ -d "$DEST" ] || { echo "zyvo: no such folder: $DEST" >&2; exit 1; }
+    TS="$(date +%Y%m%d-%H%M%S)"
+    OUT="$DEST/zyvo-backup-$TS.tar.gz"
+    echo "zyvo: backing up config + core + sessions..."
+    SRC=""
+    [ -d "$HOME/.config/opencode" ] && SRC="$SRC config/opencode"
+    [ -f "$HOME/.bashrc" ] && SRC="$SRC bashrc"
+    [ -d "$dir/../libexec" ] && SRC="$SRC libexec"
+    [ -d "$dir/../lib" ] && SRC="$SRC lib"
+    # sessions on shared storage or home
+    if [ -d /storage/emulated/0 ]; then SESS="/storage/emulated/0/zyvo"
+    elif [ -d /sdcard ]; then SESS="/sdcard/zyvo"
+    else SESS="$HOME/zyvo"; fi
+    [ -d "$SESS" ] && SRC="$SRC sessions/zyvo"
+    if [ -z "$SRC" ]; then
+        echo "zyvo: nothing to back up — install first (run: zyvo)" >&2; exit 1
+    fi
+    # tar with mapping under virtual prefixes
+    ( cd "$HOME" && tar -czf "$OUT" \
+        --transform "s|^\.config/opencode|configs|" \
+        --transform "s|^\.bashrc|shell/rc|" \
+        --transform "s|^\.local/libexec/zyvo|core|" \
+        --transform "s|^\.local/lib/zyvo|native|" \
+        --transform "s|^$SESS|sessions/zyvo|" \
+        $SRC 2>/dev/null )
+    if [ -f "$OUT" ] && [ -s "$OUT" ]; then
+        echo "  ✓ backup: $OUT ($(du -h "$OUT" 2>/dev/null | awk '{print $1}'))"
+    else
+        echo "  ✗ backup failed" >&2; exit 1
+    fi
+    exit 0
+fi
 # Browsers block scripts/fetch/CSS on file:// URLs, so HTML opened directly
 # from the file manager often shows a blank page. Serving over http:// fixes it.
 if [ "${1:-}" = "preview" ] || [ "${1:-}" = "open" ]; then
@@ -88,7 +183,7 @@ SESSION_NAME=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --yolo|-y|--safe|--ask) shift; continue;;
-        session|sessions)
+        session|sessions|menu)
             SESSION_MODE=1; shift
             [ "$#" -gt 0 ] && { SESSION_NAME="$1"; shift; }
             break;;
@@ -110,19 +205,102 @@ if [ "$SESSION_MODE" = 1 ]; then
     #   /storage/emulated/0/zyvo/<name>/
     SDIR_ROOT="${WS_BASE:-$HOME}/zyvo"
     if [ -z "$SESSION_NAME" ]; then
+        # ---- session MENU: box + numbered list + pick ----
         SESS_TMP="$TMPDIR/zyvo-session-list"
         : > "$SESS_TMP" 2>/dev/null || true
         if [ -d "$SDIR_ROOT" ]; then
-            ls -1t "$SDIR_ROOT" 2>/dev/null | while read -r d; do
-                [ -n "$d" ] && [ -d "$SDIR_ROOT/$d" ] && printf '%s\n' "$d" >> "$SESS_TMP"
+            for d in "$SDIR_ROOT"/*; do
+                [ -d "$d" ] && [ -n "${d##*/}" ] && case "${d##*/}" in
+                    .*) ;; *) printf '%s\n' "${d##*/}" >> "$SESS_TMP";;
+                esac
             done
         fi
-        echo "ZYVO sessions ($SDIR_ROOT):"
-        if [ -s "$SESS_TMP" ]; then sed 's/^/  /' "$SESS_TMP"
-        else echo "  (empty — create one with: zyvo session <name>)"; fi
-        rm -f "$SESS_TMP" 2>/dev/null || true
-        echo "Open/new: zyvo session <name>"
-        exit 0
+        # newest first
+        [ -s "$SESS_TMP" ] && sort -r "$SESS_TMP" -o "$SESS_TMP" 2>/dev/null || true
+        echo
+        echo "  ┌──────────────────────────────┐"
+        echo "  │   ZYVO — SESSIONS            │"
+        echo "  │  pick a number to resume     │"
+        echo "  │  or type a new session name  │"
+        echo "  └──────────────────────────────┘"
+        echo
+        if [ -s "$SESS_TMP" ]; then
+            n=0
+            while read -r d; do
+                n=$((n+1))
+                printf '  [%s]  %s\n' "$n" "$d"
+            done < "$SESS_TMP"
+        else
+            echo "  (no sessions yet — type a name below to create one)"
+        fi
+        echo
+        if [ -t 0 ]; then
+            # ---- interactive pick: ↑↓ arrows (or type a number/name) ----
+            COUNT="$(wc -l < "$SESS_TMP" 2>/dev/null | tr -d ' ')"
+            [ -z "$COUNT" ] && COUNT=0
+            SEL=1
+            printf '\033[?25l' 2>/dev/null || true   # hide cursor
+            while :; do
+                # re-render list with highlight
+                printf '\033[2A' 2>/dev/null || true
+                echo
+                if [ "$COUNT" -gt 0 ]; then
+                    n=0
+                    while read -r d; do
+                        n=$((n+1))
+                        if [ "$n" -eq "$SEL" ]; then
+                            printf '  \033[7m[%s]  %s\033[0m\n' "$n" "$d"
+                        else
+                            printf '  [%s]  %s\n' "$n" "$d"
+                        fi
+                    done < "$SESS_TMP"
+                else
+                    echo "  (no sessions yet — type a name below to create one)"
+                fi
+                echo
+                printf '  \033[90m↑/↓  select   Enter  open   q  quit\033[0m\n'
+                printf '  \033[2A\r  → \033[0m' 2>/dev/null || true
+                # read one key
+                KEY=""
+                IFS= read -r -s -n1 KEY || { echo; break; }
+                case "$KEY" in
+                    $'\x1b') # escape sequence (arrows)
+                        IFS= read -r -s -n2 SEQ || true
+                        case "$SEQ" in
+                            '[A') [ "$SEL" -gt 1 ] && SEL=$((SEL-1));;
+                            '[B') [ "$SEL" -lt "$COUNT" ] && SEL=$((SEL+1));;
+                        esac
+                        ;;
+                    '') # Enter
+                        if [ "$COUNT" -gt 0 ]; then
+                            printf '\033[?25h' 2>/dev/null || true
+                            NAME="$(sed -n "${SEL}p" "$SESS_TMP")"
+                            exec "$0" session "$NAME"
+                        fi
+                        ;;
+                    q|Q) printf '\033[?25h' 2>/dev/null || true; echo; exit 0;;
+                    *[0-9]*) # number → jump
+                        case "${KEY}${SEQ:-}" in
+                            *[!0-9]*) : ;;
+                            *) SEL="${KEY}${SEQ:-}"; [ "$SEL" -gt "$COUNT" ] && SEL="$COUNT";;
+                        esac
+                        # continue (treat as arrow-selection; Enter opens)
+                        ;;
+                    *)
+                        # a name (letters) → create/join it
+                        case "$KEY" in
+                            *[!A-Za-z0-9._-]*) : ;;
+                            *)
+                                printf '\033[?25h' 2>/dev/null || true
+                                exec "$0" session "$KEY";;
+                        esac
+                        ;;
+                esac
+            done
+        else
+            echo "Open/new: zyvo session <name>"
+            exit 0
+        fi
     fi
     case "$SESSION_NAME" in
         ""|"."|".."|*[!A-Za-z0-9._-]*)
