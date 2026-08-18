@@ -453,16 +453,17 @@ verify_install() {
 # entry
 # ------------------------------------------------------------
 if [ "${1:-}" = "uninstall" ]; then
+    shift # drop "uninstall"; remaining args pass through (POSIX)
     if [ -n "$ZYVO_BOOT" ] && [ -f "$ZYVO_BOOT/scripts/zyvo-uninstall" ]; then
-        exec sh "$ZYVO_BOOT/scripts/zyvo-uninstall" "${@:2}"
+        exec sh "$ZYVO_BOOT/scripts/zyvo-uninstall" "$@"
     fi
     SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo "$PWD")"
     if [ -f "$SCRIPT_DIR/scripts/zyvo-uninstall" ]; then
-        exec sh "$SCRIPT_DIR/scripts/zyvo-uninstall" "${@:2}"
+        exec sh "$SCRIPT_DIR/scripts/zyvo-uninstall" "$@"
     fi
     curl -fsSL --retry 2 --connect-timeout 15 --max-time 60 \
         -o "$TMP/zyvo-uninstall" "https://raw.githubusercontent.com/$GH_REPO/main/scripts/zyvo-uninstall" \
-        && exec sh "$TMP/zyvo-uninstall" "${@:2}"
+        && exec sh "$TMP/zyvo-uninstall" "$@"
     echo "couldn't fetch the uninstaller" >&2
     exit 1
 fi
