@@ -1,650 +1,480 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# ZYVO — ready-to-use AI coding CLI installer (v3 UI + delta update)
+# ============================================================
+#  ZYVO installer — the one-command AI coding CLI setup
+#  Install:  curl -fsSL https://raw.githubusercontent.com/
+#            zyvo9/zyvo-ai-coding/main/install.sh | bash
+#  Usage:    install.sh [uninstall]
 #
-# Delta update: the core binary carries a version stamp. If the latest
-# release tag matches, the core is NOT downloaded again (0 MB) — only the
-# ZYVO layer (config/skills/commands — a few KB) is refreshed. If the core
-# changed, a full download runs.
-#
-# Supports: Termux (native aarch64) + glibc Linux (Ubuntu proot/Debian/WSL) + macOS.
+#  Designed from scratch with three goals:
+#    1. NEVER silently fail — every step reports OK / SKIP / ERROR
+#    2. Idempotent — safe to re-run, updates in place
+#    3. Minimal dependencies — only curl + tar are mandatory
+# ============================================================
 set -e
+umask 022
 
-REPO="guysoft/opencode-termux"
+# ------------------------------------------------------------
+# Configuration
+# ------------------------------------------------------------
 GH_REPO="${GH_REPO:-zyvo9/zyvo-ai-coding}"
-DEFAULT_ZEN_KEY="${ZEN_API_KEY:-sk-PKOWRt2391BL0MP3W90yaG8qx4vofQJQgigJreBBYjrArj0lwuU1HkWUqOHgDGHP}"
-SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo "$PWD")"
-CONFIG_DIR="$HOME/.config/opencode"
-DEPS="ripgrep curl unzip tar libc++ figlet python3 openssl git"
-TOTAL_STEPS=8
-STEP_NO=0
-WARNINGS=0
-SKIPPED=""
+CORE_REPO="guysoft/opencode-termux"
+API="https://api.github.com"
+REPO_API="$API/repos/$GH_REPO"
+CORE_API="$API/repos/$CORE_REPO"
+ZEN_KEY_DEFAULT=""            # never embed a key in the repo
+OPENCODE_INSTALL_URL="https://opencode.ai/install"
+AARCH64_MATCH="android-aarch64"
+TOTAL_STEPS=6
 
-# ---------- ui ----------
-if [ -t 1 ] && [ -z "$ZYVO_NO_COLOR" ]; then
-    GREEN=$'\033[32m'; CYAN=$'\033[36m'; DIM=$'\033[2m'; RED=$'\033[31m'
-    YELLOW=$'\033[33m'; BOLD=$'\033[1m'; RESET=$'\033[0m'; MAG=$'\033[35m'
-    WHITE=$'\033[97m'
-    TTY=1
+PREFIX="${PREFIX:-}"
+if [ -n "$PREFIX" ] && [ -x "$PREFIX/bin/pkg" ]; then
+    ENV_KIND="termux"
 else
-    GREEN=''; CYAN=''; DIM=''; RED=''; YELLOW=''; BOLD=''; RESET=''; MAG=''; WHITE=''
-    TTY=0
+    case "$(uname -s)" in
+        Linux)  ENV_KIND="linux" ;;
+        Darwin) ENV_KIND="macos" ;;
+        *)      ENV_KIND="unknown" ;;
+    esac
 fi
-ANIM=1; [ -n "$ZYVO_NO_ANIM" ] && ANIM=0; [ "$TTY" = 0 ] && ANIM=0
+ARCH="$(uname -m)"
+STAMP_DIR=""          # filled after env resolution
 
-now() { date +%s; }
-say()   { printf "    ${GREEN}✓${RESET} %s\n" "$1"; }
-info()  { printf "    ${DIM}· %s${RESET}\n" "$1"; }
-warn()  { WARNINGS=$((WARNINGS+1)); printf "    ${YELLOW}!${RESET} %s\n" "$1"; }
-skip()  { SKIPPED="$SKIPPED\n      · $1"; warn "$1"; }
+# ------------------------------------------------------------
+# UI helpers
+# ------------------------------------------------------------
+if [ -t 1 ] && [ -z "$ZYVO_NO_COLOR" ]; then
+    C_G=$'\033[32m'; C_C=$'\033[36m'; C_Y=$'\033[33m'; C_R=$'\033[31m'
+    C_D=$'\033[2m';  C_B=$'\033[1m';  C_N=$'\033[0m'; C_M=$'\033[95m'
+else
+    C_G=''; C_C=''; C_Y=''; C_R=''; C_D=''; C_B=''; C_N=''; C_M=''
+fi
+
+STEP=0
+ok()   { printf "  ${C_G}✔${C_N} %s\n" "$1"; }
+info() { printf "  ${C_D}·${C_N} %s\n" "$1"; }
+warn() { printf "  ${C_Y}!${C_N} %s\n" "$1"; }
+banner() {
+    printf "${C_G}"
+    cat <<'EOF'
+  ███████  ██    ██  ██    ██  ██████
+    ███    ██    ██  ██    ██  ██   ██
+   ███     ██    ██  ██    ██  ██   ██
+  ███      ██    ██  ██    ██  ██   ██
+ ███████   ████████   ██████   ██████
+EOF
+    printf "${C_N}"
+    printf "  ${C_D}AI coding CLI · zero-config · install in ~2 min${C_N}\n\n"
+}
+step() { STEP=$((STEP+1)); printf "\n  ${C_C}${C_B}▶ [%d/%d]${C_N} %s\n" "$STEP" "$TOTAL_STEPS" "$1"; }
 fatal() {
-    echo
-    printf "  ${RED}${BOLD}╭─ INSTALL FAIL ─────────────────────────╮${RESET}\n"
-    if command -v fold >/dev/null 2>&1; then
-        printf '%s' "$1" | fold -s -w 40 | while IFS= read -r line; do
-            printf "  ${RED}${BOLD}│${RESET} %-40s ${RED}${BOLD}│${RESET}\n" "$line"
-        done
-        [ -n "$2" ] && printf '%s' "$2" | fold -s -w 36 | while IFS= read -r line; do
-            printf "  ${RED}${BOLD}│${RESET} ${DIM}fix:${RESET} %-35s ${RED}${BOLD}│${RESET}\n" "$line"
-        done
-    else
-        printf "  ${RED}${BOLD}│${RESET} %s\n" "$1"
-        [ -n "$2" ] && printf "  ${RED}${BOLD}│${RESET} ${DIM}fix:${RESET} %s\n" "$2"
-    fi
-    printf "  ${RED}${BOLD}╰─────────────────────────────────────────╯${RESET}\n"
-    echo
+    printf "\n  ${C_R}${C_B}✖ ERROR${C_N} %s\n" "$1"
+    [ -n "$2" ] && printf "  ${C_D}→ %s${C_N}\n" "$2"
     exit 1
 }
 
-bar() { # <pct> -> [████░░░░░░]
-    local pct="$1" filled empty f='' e='' i=0
-    [ "$pct" -gt 100 ] && pct=100
-    [ "$pct" -lt 0 ] && pct=0
-    filled=$((pct/10)); empty=$((10-filled))
-    while [ $i -lt $filled ]; do f="${f}█"; i=$((i+1)); done
-    i=0; while [ $i -lt $empty ]; do e="${e}░"; i=$((i+1)); done
-    printf "%s%s" "$f" "$e"
-}
+# ------------------------------------------------------------
+# core helpers
+# ------------------------------------------------------------
+cmd_exists() { command -v "$1" >/dev/null 2>&1; }
+sys_has_python() { cmd_exists python3 || cmd_exists python; }
 
-STEP_T0=0
-step() { # <title>
-    STEP_NO=$((STEP_NO+1))
-    STEP_T0="$(now)"
-    printf "\n  ${CYAN}${BOLD}◇ [%d/%d]${RESET} ${WHITE}${BOLD}%s${RESET}\n" \
-        "$STEP_NO" "$TOTAL_STEPS" "$1"
-}
-step_ok() {
-    printf "  ${DIM}└ ok · %ds${RESET}\n" "$(( $(now) - STEP_T0 ))"
-}
-
-spin() { # <label> <cmd...> — quiet run with spinner, log at $TMP/last.log
-    local label="$1"; shift
-    if [ "$ANIM" = 0 ]; then
-        info "$label..."
-        "$@" >"$TMP/last.log" 2>&1
-        return $?
-    fi
-    "$@" >"$TMP/last.log" 2>&1 &
-    local pid=$! i=0 rc=0
-    local frames='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-    while kill -0 "$pid" 2>/dev/null; do
-        i=$(( (i % 10) + 1 ))
-        printf "\r    ${MAG}%s${RESET} ${DIM}%s${RESET}   " "$(printf '%s' "$frames" | cut -c $i)" "$label"
-        sleep 0.12
-    done
-    wait "$pid" || rc=$?
-    printf "\r\033[K"
-    return $rc
-}
-
-sizeMB() { awk -v b="$1" 'BEGIN{ printf "%.1f MB", b/1048576 }'; }
-speed() {
-    awk -v b="$1" 'BEGIN{
-        if (b >= 1048576) printf "%.1f MB/s", b/1048576
-        else if (b >= 1024)  printf "%.1f KB/s", b/1024
-        else                 printf "%d B/s", b
-    }'
-}
-
-dlprogress() { # <url> <out> — live download bar (resume + retry built in)
-    local url="$1" out="$2"
-    local total=0 curl_pid got last=0 t0 t1 speedb=0 pct attempt rc=1
-    for attempt in 1 2 3; do
-        total="$(curl -sIL --connect-timeout 10 --max-time 20 "$url" \
-            | awk 'tolower($1)=="content-length:"{n=$2} END{print n+0}')"
-        curl -fLsS --retry 2 --retry-delay 2 -C - --connect-timeout 15 --max-time 900 -o "$out" "$url" &
-        curl_pid=$!
-        t0="$(now)" got=0
-        while kill -0 "$curl_pid" 2>/dev/null; do
-            got="$( { [ -f "$out" ] && wc -c < "$out" || true; } 2>/dev/null | awk '{print $1+0}')"
-            t1="$(now)"; speedb=0
-            if [ "$t1" -gt "$t0" ]; then
-                speedb=$(( (got - last) / (t1 - t0) )); last="$got"; t0="$t1"
-            fi
-            if [ "$TTY" = 1 ] && [ "$total" -gt 0 ]; then
-                pct=$(( got * 100 / total )); [ "$pct" -gt 100 ] && pct=100
-                printf "\r    ${CYAN}⬇${RESET} %s / %s  ${MAG}[%s]${RESET} %3d%%  ${DIM}%s${RESET}   " \
-                    "$(sizeMB "$got")" "$(sizeMB "$total")" "$(bar $pct)" "$pct" "$(speed "$speedb")"
-            elif [ "$TTY" = 1 ]; then
-                printf "\r    ${CYAN}⬇${RESET} %s   " "$(sizeMB "$got")"
-            fi
-            sleep 0.25
-        done
-        if wait "$curl_pid"; then rc=0; break; fi
-        warn "download attempt $attempt failed — retrying with resume"
-        sleep 2
-    done
-    [ "$TTY" = 1 ] && printf "\r\033[K"
-    [ "$rc" = 0 ] || return 1
-    say "downloaded ($(sizeMB "$(wc -c < "$out")"))"
-}
-
-banner() {
-    echo
-    if [ "$ANIM" = 1 ]; then
-        for l in ' ▄▀█ █   █▀▀ █▀█ █ █ █▀█ ▄▀█' ' █▀█ █   █▄▄ █▀▄ █▄█ █▀▄ █▀█'; do
-            printf "  ${GREEN}${BOLD}%s${RESET}\n" "$l"; sleep 0.08
-        done
+# Robust JSON getters (python preferred; sed as fallback)
+json_tag() { # <url> -> tag_name
+    local url="$1"
+    if cmd_exists python3; then
+        python3 - "$url" <<'PY' 2>/dev/null
+import json, sys, urllib.request
+try:
+    with urllib.request.urlopen(sys.argv[1], timeout=20) as r:
+        data = json.load(r)
+    print(data.get("tag_name", ""))
+except Exception:
+    pass
+PY
+    elif sys_has_python; then
+        PYTHON_CMD="python"
+        "$PYTHON_CMD" - "$url" <<'PY' 2>/dev/null
+import json, sys, urllib.request
+try:
+    with urllib.request.urlopen(sys.argv[1], timeout=20) as r:
+        data = json.load(r)
+    print(data.get("tag_name", ""))
+except Exception:
+    pass
+PY
     else
-        printf "  ${GREEN}${BOLD} ▄▀█ █   █▀▀ █▀█ █ █ █▀█ ▄▀█${RESET}\n"
-        printf "  ${GREEN}${BOLD} █▀█ █   █▄▄ █▀▄ █▄█ █▀▄ █▀█${RESET}\n"
+        curl -fsSL --connect-timeout 8 --max-time 20 "$url" 2>/dev/null \
+            | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1
     fi
-    printf "  ${DIM}AI coding CLI · zero-config · English${RESET}\n"
 }
-
-MODE="install"
-command -v zyvo >/dev/null 2>&1 && MODE="update"
-[ "${1:-}" = "uninstall" ] && exec sh "$(dirname "$0")/scripts/zyvo-uninstall" "${@:2}"
-
-banner
-
-# ---------- [1] environment ----------
-step "environment"
-ENV_KIND=""; ARCH="$(uname -m)"; KERNEL="$(uname -s)"
-if [ -n "$PREFIX" ] && [ -d "$PREFIX" ] && [ -n "$(command -v pkg 2>/dev/null || true)" ]; then
-    ENV_KIND="termux"
-elif [ "$KERNEL" = "Linux" ]; then
-    ENV_KIND="glibc"
-elif [ "$KERNEL" = "Darwin" ]; then
-    ENV_KIND="darwin"
-fi
-[ -n "$ENV_KIND" ] || fatal "this platform is not supported (Linux/macOS/Termux required)." \
-      "Use Termux (F-Droid) or an Ubuntu proot."
-
-case "$ARCH" in
-    aarch64|arm64|x86_64|amd64) :;;
-    *)
-        fatal "this device is 32-bit ($ARCH) — no AI binary is built for this arch." \
-              "Use a 64-bit (arm64/x86_64) device or Ubuntu proot (arm64).";;
-esac
-
-FREE_KB="$(df -k "$HOME" 2>/dev/null | awk 'NR==2{print $4+0}')"
-if [ -n "$FREE_KB" ] && [ "$FREE_KB" -lt 307200 ]; then
-    warn "low free space (~$((FREE_KB/1024)) MB) — keep 300 MB+ free"
-fi
-info "$ENV_KIND · $ARCH · prefix: ${PREFIX:-user-local}"
-
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-INSTALL_START="$(now)"
-
-if [ "$ENV_KIND" = "termux" ]; then
-    BIN_DIR="$PREFIX/bin"
-    LIBEXEC_DIR="$PREFIX/libexec/opencode"
-    LIB_DIR="$PREFIX/lib"
-else
-    BIN_DIR="$HOME/.local/bin"
-    LIBEXEC_DIR="$HOME/.local/libexec/zyvo"
-    LIB_DIR="$HOME/.local/lib/zyvo"
-    mkdir -p "$BIN_DIR" "$LIBEXEC_DIR" "$LIB_DIR"
-fi
-CORE_STAMP="$LIBEXEC_DIR/zyvo-core-version"
-
-if [ "$ENV_KIND" = "termux" ] && [ ! -d "$HOME/storage" ] && command -v termux-setup-storage >/dev/null 2>&1; then
-    termux-setup-storage >/dev/null 2>&1 || true
-    sleep 2
-fi
-if [ -d /storage/emulated/0 ] && [ -r /storage/emulated/0 ]; then
-    say "storage OK (/storage/emulated/0)"
-elif [ -d /sdcard ] && [ -r /sdcard ]; then
-    say "storage OK (/sdcard)"
-else
-    skip "shared storage not available — run 'termux-setup-storage' in Termux"
-fi
-step_ok
-
-# ---------- [2] dependencies ----------
-step "dependencies"
-needs_update() {
-    local d="$PREFIX/var/lib/apt/lists"
-    [ -d "$d" ] || return 0
-    find "$d" -type f -newermt "-12 hours" 2>/dev/null | grep -q . && return 1 || return 0
-}
-switch_official_repo() {
-    [ -f "$PREFIX/etc/apt/sources.list" ] || return 1
-    grep -q "packages.termux.dev" "$PREFIX/etc/apt/sources.list" 2>/dev/null && return 1
-    cp "$PREFIX/etc/apt/sources.list" "$PREFIX/etc/apt/sources.list.zyvo.bak" 2>/dev/null || true
-    rm -f "$PREFIX"/etc/apt/sources.list.d/*.list "$PREFIX"/etc/apt/sources.list.d/*.sources 2>/dev/null || true
-    echo "deb https://packages.termux.dev/apt/termux-main stable main" > "$PREFIX/etc/apt/sources.list"
-    return 0
-}
-pkg_install() { pkg install -y $DEPS; }
-glibc_deps() {
-    command -v apt-get >/dev/null 2>&1 || return 1
-    spin "apt packages: curl unzip tar python3 git ripgrep" \
-        bash -c "apt-get update -y; DEBIAN_FRONTEND=noninteractive apt-get install -y curl unzip tar python3 git ripgrep"
-}
-
-if [ "$ENV_KIND" = "termux" ]; then
-    if [ "$(id -u)" = "0" ]; then
-        warn "pkg does not work as root — using existing tools"
-    elif ! command -v pkg >/dev/null 2>&1; then
-        warn "pkg not found — using existing tools"
+json_asset_url() { # <url> <match> -> first .zip asset URL
+    local url="$1" match="$2"
+    if cmd_exists python3; then
+        python3 - "$url" "$match" <<'PY' 2>/dev/null
+import json, sys, urllib.request
+try:
+    with urllib.request.urlopen(sys.argv[1], timeout=30) as r:
+        rel = json.load(r)
+    for a in rel.get("assets", []):
+        n = a.get("name", "")
+        if sys.argv[2] in n and n.endswith(".zip"):
+            print(a["browser_download_url"]); break
+except Exception:
+    pass
+PY
+    elif sys_has_python; then
+        "python" - "$url" "$match" <<'PY' 2>/dev/null
+import json, sys, urllib.request
+try:
+    with urllib.request.urlopen(sys.argv[1], timeout=30) as r:
+        rel = json.load(r)
+    for a in rel.get("assets", []):
+        n = a.get("name", "")
+        if sys.argv[2] in n and n.endswith(".zip"):
+            print(a["browser_download_url"]); break
+except Exception:
+    pass
+PY
     else
-        if needs_update; then
-            spin "package index update" pkg update -y || true
-        fi
-        if spin "installing: $DEPS" pkg_install; then
-            say "dependencies installed"
-        else
-            warn "pkg install failed — retrying (fresh index)"
-            if ! spin "retry" bash -c "pkg update -y; pkg install -y $DEPS"; then
-                if switch_official_repo && spin "switching to official mirror" bash -c "pkg update -y; pkg install -y $DEPS"; then
-                    say "dependencies installed (official mirror)"
-                else
-                    tail -n 8 "$TMP/last.log" 2>/dev/null || true
-                    fatal "dependency install failed." "Run 'termux-change-repo', then rerun the installer."
-                fi
-            fi
-        fi
+        curl -fsSL --connect-timeout 10 --max-time 30 "$url" 2>/dev/null \
+            | grep -o "https://[^\"]*${match}\.zip" | head -n1
     fi
-elif [ "$ENV_KIND" = "glibc" ]; then
-    if command -v curl >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
-        glibc_deps || warn "apt install skipped — without python3 the branding patch will be skipped"
-    else
-        glibc_deps || fatal "curl/tar not found — install via apt: apt-get install -y curl tar"
-    fi
-else
-    info "macOS — using existing tools"
-fi
+}
 
-heal_broken_libs() {
-    local out
-    out="$(git ls-remote https://github.com/$GH_REPO.git HEAD 2>&1 || true)"
-    case "$out" in
-        *"cannot locate symbol"*|*"CANNOT LINK"*|*"aborted session"*)
-            warn "outdated Termux packages (git/openssl mismatch) — auto upgrading"
-            spin "pkg upgrade" bash -c \
-                "pkg update -y; DEBIAN_FRONTEND=noninteractive pkg upgrade -y -o Dpkg::Options::=--force-confold" || true
-            say "packages upgraded"
+# ------------------------------------------------------------
+# setup: environment + paths
+# ------------------------------------------------------------
+setup_env() {
+    banner
+    step "Environment"
+    info "platform: $ENV_KIND · arch: $ARCH"
+
+    case "$ENV_KIND" in
+        termux)
+            BIN_DIR="$PREFIX/bin"
+            STAMP_DIR="$PREFIX/libexec/opencode"
+            LIB_DIR="$PREFIX/lib"
+            ;;
+        linux|macos)
+            BIN_DIR="$HOME/.local/bin"
+            STAMP_DIR="$HOME/.local/libexec/zyvo"
+            LIB_DIR="$HOME/.local/lib/zyvo"
+            mkdir -p "$BIN_DIR" "$STAMP_DIR" "$LIB_DIR"
+            ;;
+        *)
+            fatal "unsupported OS: $(uname -s)" "Run inside Termux (Android), Linux, or macOS."
             ;;
     esac
+
+    case "$ARCH" in
+        aarch64|arm64|x86_64|amd64) : ;;
+        *)
+            fatal "unsupported arch: $ARCH" "64-bit device (arm64/x86_64) or Ubuntu proot required."
+            ;;
+    esac
+    ok "environment ready: $ENV_KIND/$ARCH"
 }
-if [ "$ENV_KIND" = "termux" ] && command -v git >/dev/null 2>&1 && command -v pkg >/dev/null 2>&1 && [ "$(id -u)" != "0" ]; then
-    heal_broken_libs
-fi
 
-for dep in curl tar; do
-    command -v "$dep" >/dev/null 2>&1 || fatal "$dep missing." "install it: $dep"
-done
-for dep in rg unzip python3 git; do
-    command -v "$dep" >/dev/null 2>&1 || skip "$dep not found — some features will be skipped"
-done
-say "required tools present"
-step_ok
-
-# ---------- [3] core (DELTA) ----------
-step "core engine (delta check)"
-gh_latest_tag() { # $1=repo api url — python parses the JSON, sed fallback
-    local api="$1" out=""
-    if command -v python3 >/dev/null 2>&1; then
-        out="$(curl -fsSL --connect-timeout 8 --max-time 20 "$api" 2>/dev/null \
-            | python3 -c "import json,sys
-try:
-    print(json.load(sys.stdin).get('tag_name',''))
-except Exception:
-    print('')" 2>/dev/null)"
-    else
-        out="$(curl -fsSL --connect-timeout 8 --max-time 20 "$api" 2>/dev/null \
-            | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n1)"
-    fi
-    printf '%s' "$out" | tr -d '[:space:]'
-}
-gh_zip_url() { # $1=repo api url $2=asset name match — first matching zip URL
-    local api="$1" want="$2" out=""
-    if command -v python3 >/dev/null 2>&1; then
-        out="$(curl -fsSL --connect-timeout 10 --max-time 30 "$api" 2>/dev/null \
-            | python3 -c "import json,sys
-try:
-    r = json.load(sys.stdin)
-    for a in r.get('assets', []):
-        n = a.get('name','')
-        if '$want' in n and n.endswith('.zip'):
-            print(a['browser_download_url'])
-            break
-except Exception:
-    pass" 2>/dev/null)"
-    else
-        out="$(curl -fsSL --connect-timeout 10 --max-time 30 "$api" 2>/dev/null \
-            | grep -o "https://[^\"]*${want}\.zip" | head -n1)"
-    fi
-    printf '%s' "$out" | tr -d '[:space:]'
-}
-OC_OFFICIAL_BIN=""
-SKIP_CORE=0
-LATEST_TAG=""
-
-if [ "$ENV_KIND" = "termux" ]; then
-    LATEST_TAG="$(gh_latest_tag "https://api.github.com/repos/$REPO/releases/latest" || true)"
-    INSTALLED_TAG=""
-    [ -f "$CORE_STAMP" ] && INSTALLED_TAG="$(tr -d '[:space:]' < "$CORE_STAMP")"
-    if [ -n "$LATEST_TAG" ] && [ -n "$INSTALLED_TAG" ] && [ "$INSTALLED_TAG" = "$LATEST_TAG" ] \
-        && [ -x "$LIBEXEC_DIR/opencode.bin" ]; then
-        SKIP_CORE=1
-        say "core UP-TO-DATE ($LATEST_TAG) — 0 MB download, skipping"
-    else
-        [ -n "$INSTALLED_TAG" ] && info "core update: $INSTALLED_TAG → ${LATEST_TAG:-latest}"
-        # try native aarch64 first; x86_64 falls back to aarch64 build when
-        # no x86_64 zip exists in the release (guysoft currently ships aarch64 only)
-        ZIP_MATCH="android-aarch64"
-        ZIP_URL="$(gh_zip_url "https://api.github.com/repos/$REPO/releases/latest" "$ZIP_MATCH" || true)"
-        if [ -z "$ZIP_URL" ] && { [ "$ARCH" = "x86_64" ] || [ "$ARCH" = "amd64" ]; }; then
-            warn "no android-x86_64 zip in release — falling back to aarch64 build (works via proot/emulation, may be slower)"
-        fi
-        if [ -z "$ZIP_URL" ]; then
-            fatal "no native Android build found in the latest release of $REPO." \
-                  "Install inside Ubuntu proot (official build auto-installs there), or wait for a new release."
-        fi
-        SUMS_URL="${ZIP_URL%/*}/SHA256SUMS"
-        info "download: $(basename "$ZIP_URL")"
-        dlprogress "$ZIP_URL" "$TMP/opencode.zip" || fatal "download failed — check your internet." "Rerun the installer (resume supported)"
-        if curl -fsSL --retry 3 --connect-timeout 15 --max-time 60 -o "$TMP/SHA256SUMS" "$SUMS_URL" 2>/dev/null; then
-            EXPECTED="$(grep "$(basename "$ZIP_URL")" "$TMP/SHA256SUMS" | awk '{print $1}' | head -n1)"
-            ACTUAL="$(sha256sum "$TMP/opencode.zip" 2>/dev/null | awk '{print $1}')"
-            if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
-                rm -f "$TMP/opencode.zip"
-                fatal "SHA256 mismatch — download corrupted." "Rerun the installer"
-            fi
-            say "integrity verified (SHA256)"
-        else
-            warn "SHA256SUMS not available — integrity check skipped"
-        fi
-    fi
-    # version compare — android build vs latest opencode (info only)
-    BUILD_VER="$(printf '%s' "${ZIP_URL:-$(basename "$0")}" | grep -oE '[0-9]+(\.[0-9]+)+' | head -n1)"
-    OC_LATEST_TAG="$(gh_latest_tag "https://api.github.com/repositories/975734319/releases/latest" || true)"
-    OC_LATEST_VER="$(printf '%s' "$OC_LATEST_TAG" | sed 's/[^0-9.]//g')"
-    if [ -n "$BUILD_VER" ] && [ -n "$OC_LATEST_VER" ] && [ "$BUILD_VER" != "$OC_LATEST_VER" ]; then
-        info "android build: $BUILD_VER · opencode latest: $OC_LATEST_VER — auto-included on next update when guysoft ships a new build"
-    fi
-else
-    LATEST_TAG="$(gh_latest_tag "https://api.github.com/repositories/975734319/releases/latest" || true)"
-    INSTALLED_TAG=""
-    [ -f "$CORE_STAMP" ] && INSTALLED_TAG="$(tr -d '[:space:]' < "$CORE_STAMP")"
-    OC_BIN_CHECK="$HOME/.opencode/bin/opencode"
-    if [ -n "$LATEST_TAG" ] && [ -n "$INSTALLED_TAG" ] && [ "$INSTALLED_TAG" = "$LATEST_TAG" ] \
-        && [ -x "$OC_BIN_CHECK" ]; then
-        SKIP_CORE=1
-        say "core UP-TO-DATE ($LATEST_TAG) — 0 MB download, skipping"
-    else
-        if ! curl -fsSL --retry 3 --connect-timeout 15 --max-time 60 -o "$TMP/oc-install.sh" "https://opencode.ai/install" 2>/dev/null; then
-            fatal "could not fetch the opencode.ai installer." "Check your internet, then rerun"
-        fi
-        if ! spin "official opencode core install" bash "$TMP/oc-install.sh"; then
-            tail -n 8 "$TMP/last.log" 2>/dev/null || true
-            fatal "official core install failed." "Run manually for the log: bash $TMP/oc-install.sh"
-        fi
-        say "official core installed"
-    fi
-fi
-step_ok
-
-# ---------- [4] native libs ----------
-step "native libraries"
-extract_one() {
-    if command -v unzip >/dev/null 2>&1; then (cd "$TMP" && unzip -o -q "$1" "$2" 2>/dev/null)
-    elif command -v busybox >/dev/null 2>&1; then (cd "$TMP" && busybox unzip -o -q "$1" "$2" 2>/dev/null)
-    else return 1; fi
-}
-if [ "$ENV_KIND" = "termux" ] && [ "$SKIP_CORE" = 0 ]; then
-    if [ ! -f "$LIB_DIR/libc++_shared.so" ]; then
-        if extract_one "$TMP/opencode.zip" libc++_shared.so; then
-            install -m644 "$TMP/libc++_shared.so" "$LIB_DIR/libc++_shared.so"
-            say "libc++_shared.so installed"
-        elif command -v pkg >/dev/null 2>&1 && spin "libc++ install" pkg install -y libc++; then
-            say "libc++ installed (pkg)"
-        else
-            skip "libc++ install failed — run 'pkg install -y libc++' yourself"
-        fi
-    else
-        info "native libs already present"
-    fi
-else
-    info "skip (core unchanged / $ENV_KIND)"
-fi
-step_ok
-
-# ---------- [5] source ----------
-step "zyvo layer source"
-fetch_source() {
-    for br in main master; do
-        if curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 300 \
-            -o "$TMP/source.tar.gz" "https://codeload.github.com/$GH_REPO/tar.gz/refs/heads/$br" 2>/dev/null; then
-            mkdir -p "$TMP/source"
-            tar -xzf "$TMP/source.tar.gz" -C "$TMP/source" --strip-components=1 2>/dev/null \
-                && [ -d "$TMP/source/config" ] && return 0
-            rm -rf "$TMP/source" "$TMP/source.tar.gz"
-        fi
+# ------------------------------------------------------------
+# step 2: dependencies (best-effort; only curl+tar are required)
+# ------------------------------------------------------------
+setup_deps() {
+    step "Dependencies"
+    NEED=""
+    for d in curl tar; do
+        cmd_exists "$d" || NEED="$NEED $d"
     done
-    for br in main master; do
-        if curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 300 \
-            -o "$TMP/source.zip" "https://codeload.github.com/$GH_REPO/zip/refs/heads/$br" 2>/dev/null; then
-            rm -rf "$TMP/srcz"; mkdir -p "$TMP/srcz"
-            if unzip -o -q "$TMP/source.zip" -d "$TMP/srcz" 2>/dev/null; then
-                d="$(find "$TMP/srcz" -maxdepth 1 -mindepth 1 -type d | head -n1)"
-                if [ -n "$d" ] && [ -d "$d/config" ]; then
-                    rm -rf "$TMP/source"; mv "$d" "$TMP/source"; return 0
+    [ -n "$NEED" ] && fatal "missing required tools:$NEED" "Install them with your package manager, then rerun."
+
+    if [ "$ENV_KIND" = "termux" ]; then
+        if [ "$(id -u)" = "0" ]; then
+            warn "running as root — 'pkg' is unavailable; using existing tools"
+        elif cmd_exists pkg; then
+            PKGS="python3 ripgrep unzip git"
+            MISSING=""
+            for p in $PKGS; do
+                cmd_exists "$p" || MISSING="$MISSING $p"
+            done
+            if [ -n "$MISSING" ]; then
+                info "installing:$MISSING"
+                if pkg install -y $MISSING >/dev/null 2>&1; then
+                    ok "packages installed"
+                else
+                    warn "couldn't auto-install ($MISSING) — continuing with what exists"
                 fi
+            else
+                ok "all tools present"
             fi
-            rm -rf "$TMP/srcz" "$TMP/source.zip"
+        else
+            warn "'pkg' not found — running with existing tools"
         fi
-    done
-    if command -v git >/dev/null 2>&1; then
-        git clone --depth 1 -q "https://github.com/$GH_REPO.git" "$TMP/source" 2>/dev/null \
-            && [ -d "$TMP/source/config" ] && return 0
-        rm -rf "$TMP/source"
+    else
+        info "not Termux — using system tools"
     fi
+}
+
+# ------------------------------------------------------------
+# step 3: core binary (with delta check)
+# ------------------------------------------------------------
+setup_core() {
+    step "Core engine"
+    if [ "$ENV_KIND" = "termux" ]; then
+        install_core_termux
+    else
+        install_core_official
+    fi
+}
+
+install_core_termux() {
+    local tag installed zip_url sums actual expected
+    tag="$(json_tag "$CORE_API/releases/latest")"
+    [ -n "$tag" ] || { warn "couldn't reach $CORE_REPO — verifying existing install"; }
+
+    installed=""
+    [ -f "$STAMP_DIR/zyvo-core-version" ] && installed="$(cat "$STAMP_DIR/zyvo-core-version" 2>/dev/null | tr -d '[:space:]')"
+
+    if [ -n "$tag" ] && [ "$tag" = "$installed" ] && [ -x "$STAMP_DIR/opencode.bin" ]; then
+        ok "core up-to-date ($tag) — 0 MB download"
+        return
+    fi
+
+    zip_url="$(json_asset_url "$CORE_API/releases/latest" "$AARCH64_MATCH")"
+    if [ -z "$zip_url" ]; then
+        # try x86_64 as a last resort; most devices are aarch64 anyway
+        if [ "$ARCH" = "x86_64" ] || [ "$ARCH" = "amd64" ]; then
+            zip_url="$(json_asset_url "$CORE_API/releases/latest" "android-x86_64")"
+        fi
+        if [ -z "$zip_url" ]; then
+            fatal "no Android core build found for this release" \
+                  "Try again later, or use Ubuntu proot for a Linux build."
+        fi
+    fi
+
+    info "downloading: $(basename "$zip_url")"
+    TMP="$(mktemp -d)"
+    trap 'rm -rf "$TMP"' EXIT
+
+    curl -fL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 900 \
+        -C - -o "$TMP/core.zip" "$zip_url" || fatal "download failed" "Check your internet and rerun."
+    ok "downloaded ($(du -h "$TMP/core.zip" | cut -f1))"
+
+    # checksum when available (never blocks install)
+    if curl -fsSL --retry 2 --connect-timeout 10 --max-time 30 -o "$TMP/SHA256SUMS" "${zip_url%/*}/SHA256SUMS" 2>/dev/null; then
+        expected="$(grep "$(basename "$zip_url")" "$TMP/SHA256SUMS" | awk '{print $1}' | head -n1)"
+        actual="$(sha256sum "$TMP/core.zip" | awk '{print $1}')"
+        if [ -n "$expected" ] && [ "$expected" != "$actual" ]; then
+            fatal "checksum mismatch — download corrupted" "Rerun the installer."
+        fi
+        ok "integrity verified (SHA256)"
+    else
+        warn "no checksum file — skipping integrity check"
+    fi
+
+    mkdir -p "$BIN_DIR" "$STAMP_DIR" "$LIB_DIR"
+    ( cd "$TMP" && unzip -oq core.zip ) || fatal "couldn't extract the core zip" "Unzip failed — rerun."
+    [ -f "$TMP/opencode.bin" ] || [ -f "$TMP/opencode" ] || fatal "core zip has no binary" "The release format changed — report this."
+
+    # install binary + native libraries
+    if [ -f "$TMP/opencode.bin" ]; then
+        install -m755 "$TMP/opencode.bin" "$STAMP_DIR/opencode.bin"
+    else
+        install -m755 "$TMP/opencode" "$STAMP_DIR/opencode.bin"
+    fi
+    for lib in libtagfix.so libopentui.so libc++_shared.so; do
+        [ -f "$TMP/$lib" ] && install -m644 "$TMP/$lib" "$LIB_DIR/$lib" 2>/dev/null || true
+    done
+    [ -f "$TMP/librust_pty_arm64.so" ] && install -m644 "$TMP/librust_pty_arm64.so" "$LIB_DIR/" 2>/dev/null || true
+
+    # move any stale opencode out of the way
+    [ -e "$PREFIX/bin/opencode" ] && mv "$PREFIX/bin/opencode" "$PREFIX/bin/opencode.bak" 2>/dev/null || true
+    [ -n "$tag" ] && printf '%s' "$tag" > "$STAMP_DIR/zyvo-core-version"
+
+    ok "core installed → $STAMP_DIR/opencode.bin"
+}
+
+install_core_official() {
+    local tag installed check
+    tag="$(json_tag "$REPO_API/releases/latest" 2>/dev/null)"
+    installed=""
+    [ -f "$STAMP_DIR/zyvo-core-version" ] && installed="$(cat "$STAMP_DIR/zyvo-core-version" 2>/dev/null | tr -d '[:space:]')"
+    check="$HOME/.opencode/bin/opencode"
+
+    if [ -n "$tag" ] && [ "$tag" = "$installed" ] && [ -x "$check" ]; then
+        ok "core up-to-date ($tag) — 0 MB download"
+        return
+    fi
+
+    TMP="$(mktemp -d)"
+    trap 'rm -rf "$TMP"' EXIT
+
+    info "installing official opencode core"
+    curl -fsSL --retry 3 --connect-timeout 15 --max-time 120 -o "$TMP/oc-install.sh" "$OPENCODE_INSTALL_URL" \
+        || fatal "couldn't fetch the official installer" "Check your internet and rerun."
+    bash "$TMP/oc-install.sh" >/dev/null 2>&1 || fatal "official core install failed" "Run: bash ~/.opencode/bin/install.sh  (see its log)"
+
+    [ -x "$check" ] || fatal "official core missing after install" "The opencode installer did not produce a binary."
+    cp "$check" "$STAMP_DIR/opencode.bin"
+    chmod 755 "$STAMP_DIR/opencode.bin"
+    [ -n "$tag" ] && printf '%s' "$tag" > "$STAMP_DIR/zyvo-core-version"
+    ok "core installed (official build)"
+}
+
+# ------------------------------------------------------------
+# step 4: zyvo layer (wrapper, config, skills, commands) from repo
+# ------------------------------------------------------------
+setup_layer() {
+    step "ZYVO layer (config + skills + commands)"
+    TMP="$(mktemp -d)"
+    trap 'rm -rf "$TMP"' EXIT
+
+    fetch_repo "$TMP" || fatal "couldn't download the ZYVO layer" "Check your internet and rerun."
+
+    # wrapper + helper scripts
+    install_wrapper "$TMP/scripts/zyvo"         "$BIN_DIR/zyvo"
+    [ -f "$TMP/scripts/zyvo-menu" ]     && install_wrapper "$TMP/scripts/zyvo-menu" "$BIN_DIR/zyvo-menu"
+    [ -f "$TMP/scripts/zyvo-uninstall" ] && install_wrapper "$TMP/scripts/zyvo-uninstall" "$BIN_DIR/zyvo-uninstall"
+    [ -f "$TMP/scripts/oc-settings.sh" ] && install_wrapper "$TMP/scripts/oc-settings.sh" "$BIN_DIR/oc-settings"
+
+    CONFIG_DIR="$HOME/.config/opencode"
+    mkdir -p "$CONFIG_DIR/agent" "$CONFIG_DIR/command" "$CONFIG_DIR/themes" "$CONFIG_DIR/skills"
+
+    # config merge (never clobber user settings)
+    if sys_has_python; then
+        cp -f "$TMP/config/opencode.json" "$CONFIG_DIR/opencode.json.new" 2>/dev/null || true
+        if [ -f "$CONFIG_DIR/opencode.json" ]; then
+            merge_json "$CONFIG_DIR/opencode.json" "$CONFIG_DIR/opencode.json.new"
+        else
+            mv "$CONFIG_DIR/opencode.json.new" "$CONFIG_DIR/opencode.json"
+        fi
+        rm -f "$CONFIG_DIR/opencode.json.new"
+    else
+        [ -f "$CONFIG_DIR/opencode.json" ] || cp "$TMP/config/opencode.json" "$CONFIG_DIR/opencode.json"
+    fi
+    [ -f "$TMP/config/tui.json" ] && cp -f "$TMP/config/tui.json" "$CONFIG_DIR/tui.json" 2>/dev/null || true
+    cp -f "$TMP"/config/agent/*.md     "$CONFIG_DIR/agent/"       2>/dev/null || true
+    cp -f "$TMP"/config/command/*.md   "$CONFIG_DIR/command/"     2>/dev/null || true
+    cp -f "$TMP"/config/themes/*.json  "$CONFIG_DIR/themes/"      2>/dev/null || true
+    cp -rn "$TMP"/skills/*             "$CONFIG_DIR/skills/"      2>/dev/null || true
+
+    ok "config + $(ls -1 "$CONFIG_DIR/command" 2>/dev/null | wc -l | tr -d ' ') commands + $(ls -1d "$CONFIG_DIR/skills"/*/ 2>/dev/null | wc -l | tr -d ' ') skills"
+
+    # PATH + provider key in rc file
+    setup_rc
+}
+
+fetch_repo() { # $1 = dest dir
+    local dest="$1"
+    if curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 120 \
+        -o "$dest/layer.tar.gz" "https://codeload.github.com/$GH_REPO/tar.gz/refs/heads/main" 2>/dev/null; then
+        tar -xzf "$dest/layer.tar.gz" -C "$dest" --strip-components=1 2>/dev/null \
+            && [ -d "$dest/config" ] && [ -d "$dest/skills" ] && return 0
+        rm -rf "$dest"/* 2>/dev/null || true
+    fi
+    git clone --depth 1 -q "https://github.com/$GH_REPO.git" "$dest/src" 2>/dev/null \
+        && [ -d "$dest/src/config" ] && { mv "$dest/src"/* "$dest/" 2>/dev/null || true; rm -rf "$dest/src"; return 0; }
     return 1
 }
-if [ -d "$SCRIPT_DIR/config" ] && [ -d "$SCRIPT_DIR/skills" ]; then
-    info "local source used ($SCRIPT_DIR)"
-else
-    fetch_source || fatal "could not fetch source." "Check your internet, or run from the repo folder: bash install.sh"
-    SCRIPT_DIR="$TMP/source"
-    say "source downloaded (delta — a few KB)"
-fi
-step_ok
 
-# ---------- [6] core install ----------
-step "core install"
-patch_brand() {
-    [ -f "$SCRIPT_DIR/scripts/patch-brand.py" ] && command -v python3 >/dev/null 2>&1 || return 1
-    python3 "$SCRIPT_DIR/scripts/patch-brand.py" "$1" "$2" "${@:3}" 2>/dev/null || return 1
+merge_json() { # $1 = existing user config, $2 = new repo config
+    local py
+    if cmd_exists python3; then py=python3; else py=python; fi
+    "$py" - "$1" "$2" <<'PY'
+import json, sys
+user_path, repo_path = sys.argv[1], sys.argv[2]
+try:
+    user = json.load(open(user_path))
+except Exception:
+    user = {}
+try:
+    repo = json.load(open(repo_path))
+except Exception:
+    repo = {}
+# add missing keys from repo, keep user's values for existing keys
+for k, v in repo.items():
+    user.setdefault(k, v)
+json.dump(user, open(user_path, "w"), indent=2)
+PY
 }
-install_script() { # $1=repo path $2=dest — rewrites shebang for glibc
+
+install_wrapper() { # $1 = src $2 = dest
     if [ "$ENV_KIND" = "termux" ]; then
         install -m755 "$1" "$2"
     else
         sed '1s|^#!.*|#!/usr/bin/env bash|' "$1" > "$2" && chmod 755 "$2"
     fi
 }
-install_core_termux() {
-    cd "$TMP"
-    unzip -o -q opencode.zip
-    mkdir -p "$BIN_DIR" "$LIBEXEC_DIR" "$LIB_DIR"
-    if [ -f "$SCRIPT_DIR/scripts/zyvo" ]; then
-        install -m755 "$SCRIPT_DIR/scripts/zyvo" "$BIN_DIR/zyvo"
+
+setup_rc() {
+    local rc="$HOME/.bashrc"
+    [ "$ENV_KIND" != "termux" ] && [ ! -f "$HOME/.bashrc" ] && [ -f "$HOME/.profile" ] && rc="$HOME/.profile"
+
+    # PATH
+    if ! grep -q 'ZYVO PATH' "$rc" 2>/dev/null; then
+        printf '# ZYVO PATH\ncase ":$PATH:" in *":%s:"*) ;; *) export PATH="%s:$PATH";; esac\n' \
+            "$BIN_DIR" "$BIN_DIR" >> "$rc"
+    fi
+    # provider key (only from the user's own env — never a hardcoded default)
+    if [ -n "$ZEN_API_KEY" ] && ! grep -q "OPENCODE_API_KEY" "$rc" 2>/dev/null; then
+        printf '\n# ZYVO AI\nexport OPENCODE_API_KEY="%s"\n' "$ZEN_API_KEY" >> "$rc"
+    fi
+    if grep -q "OPENCODE_API_KEY" "$rc" 2>/dev/null; then
+        ok "AI provider configured (OpenCode Zen)"
     else
-        install -m755 opencode "$BIN_DIR/zyvo"
+        warn "no ZEN_API_KEY set — get one at opencode.ai/zen then add it to ~/.bashrc"
     fi
-    if patch_brand opencode.bin opencode.bin.zyvo; then
-        patch_brand opencode.bin.zyvo opencode.bin.zyvo --blank-logo 2>/dev/null || true
-        mv opencode.bin.zyvo opencode.bin
-    fi
-    install -m755 opencode.bin "$LIBEXEC_DIR/opencode.bin"
-    install -m644 libtagfix.so libopentui.so "$LIB_DIR/"
-    [ -f "$LIB_DIR/libc++_shared.so" ] || install -m644 libc++_shared.so "$LIB_DIR/" 2>/dev/null || true
-    [ -f librust_pty_arm64.so ] && install -m644 librust_pty_arm64.so "$LIB_DIR/"
-    [ -e "$PREFIX/bin/opencode" ] && mv "$PREFIX/bin/opencode" "$PREFIX/bin/opencode.bak" 2>/dev/null || true
-    return 0
+    ok "PATH ready ($BIN_DIR)"
 }
-install_core_official() {
-    mkdir -p "$BIN_DIR" "$LIBEXEC_DIR"
-    OC_OFFICIAL_BIN="$HOME/.opencode/bin/opencode"
-    [ -x "$OC_OFFICIAL_BIN" ] || OC_OFFICIAL_BIN="$(command -v opencode 2>/dev/null || true)"
-    [ -n "$OC_OFFICIAL_BIN" ] || return 1
-    cp "$OC_OFFICIAL_BIN" "$LIBEXEC_DIR/opencode.bin"
-    if patch_brand "$LIBEXEC_DIR/opencode.bin" "$LIBEXEC_DIR/opencode.bin.zyvo"; then
-        mv "$LIBEXEC_DIR/opencode.bin.zyvo" "$LIBEXEC_DIR/opencode.bin"
+
+# ------------------------------------------------------------
+# step 5: verify
+# ------------------------------------------------------------
+verify_install() {
+    step "Verify"
+    if [ ! -x "$BIN_DIR/zyvo" ]; then
+        fatal "wrapper missing at $BIN_DIR/zyvo" "Rerun the installer."
     fi
-    chmod 755 "$LIBEXEC_DIR/opencode.bin"
-    install_script "$SCRIPT_DIR/scripts/zyvo" "$BIN_DIR/zyvo"
-    return 0
-}
-if [ "$SKIP_CORE" = 1 ]; then
-    # core unchanged — refresh wrapper only (binary skipped)
-    install_script "$SCRIPT_DIR/scripts/zyvo" "$BIN_DIR/zyvo"
-    say "binary skipped (delta) — wrapper refreshed"
-else
-    if [ "$ENV_KIND" = "termux" ]; then
-        spin "binary + libs install" install_core_termux \
-            || { tail -n 8 "$TMP/last.log" 2>/dev/null || true; fatal "core install failed." "Rerun the installer"; }
+    if [ ! -f "$STAMP_DIR/opencode.bin" ]; then
+        warn "core binary not found at $STAMP_DIR/opencode.bin"
     else
-        spin "wrapper + branding install" install_core_official \
-            || { tail -n 8 "$TMP/last.log" 2>/dev/null || true; fatal "core install failed." "Rerun the installer"; }
+        ok "core binary present"
     fi
-    [ -n "$LATEST_TAG" ] && echo "$LATEST_TAG" > "$CORE_STAMP" 2>/dev/null || true
-    say "core installed → $LIBEXEC_DIR/opencode.bin"
-fi
-[ -f "$SCRIPT_DIR/scripts/zyvo-menu" ] && install_script "$SCRIPT_DIR/scripts/zyvo-menu" "$BIN_DIR/zyvo-menu"
-[ -f "$SCRIPT_DIR/scripts/zyvo-uninstall" ] && install_script "$SCRIPT_DIR/scripts/zyvo-uninstall" "$BIN_DIR/zyvo-uninstall"
-step_ok
+    VERSION="$("$BIN_DIR/zyvo" --version 2>&1 || true)"
+    ok "zyvo verified: ${VERSION:-version unknown}"
+}
 
-# ---------- [7] config + skills + provider ----------
-step "config, skills + provider"
-merge_config() {
-    python3 - "$SCRIPT_DIR/config" "$CONFIG_DIR" <<'PY'
-import json, os, shutil, sys
-src_dir, cfg_dir = sys.argv[1], sys.argv[2]
-src = os.path.join(src_dir, "opencode.json")
-dst = os.path.join(cfg_dir, "opencode.json")
-os.makedirs(cfg_dir, exist_ok=True)
-if not os.path.exists(dst):
-    shutil.copy2(src, dst)
-    sys.exit(0)
-try:
-    base = json.load(open(dst))
-except Exception:
-    shutil.copy2(src, dst)
-    sys.exit(0)
-shutil.copy2(dst, dst + ".bak")
-try:
-    new = json.load(open(src))
-except Exception:
-    new = {}
-for k in ("username", "model", "small_model", "default_agent"):
-    if k not in base and k in new:
-        base[k] = new[k]
-# dead-model auto-fix: ling-3.0 was dropped from the free list
-if "ling-3.0" in base.get("small_model", ""):
-    base["small_model"] = new.get("small_model", "zyvo/laguna-s-2.1-free")
-# nemotron-3-ultra reports provider errors — fall back to deepseek (stable default)
-if base.get("model", "").endswith("nemotron-3-ultra-free") and "model" in new:
-    base["model"] = new["model"]
-base.setdefault("snapshot", False)
-base.setdefault("autoupdate", False)
-base.setdefault("share", "disabled")
-base.setdefault("watcher", new.get("watcher", {}))
-providers = base.setdefault("provider", {})
-for pk, pv in new.get("provider", {}).items():
-    providers.setdefault(pk, pv)
-base["permission"] = {
-    "bash": "allow", "edit": "allow", "webfetch": "allow",
-    "websearch": "allow", "external_directory": "allow", "doom_loop": "allow",
+# ------------------------------------------------------------
+# step 6: done card
+# ------------------------------------------------------------
+finish() {
+    step "Done"
+    printf "\n  ${C_G}${C_B}════════════════════════════════════════════${C_N}\n"
+    printf "  ${C_B}  ZYVO is READY ⚡${C_N}\n"
+    printf "  ${C_G}${C_B}════════════════════════════════════════════${C_N}\n"
+    printf "  ${C_B}zyvo${C_N}              start the AI (full-power)\n"
+    printf "  ${C_B}zyvo preview${C_N}      open a page in the browser\n"
+    printf "  ${C_B}zyvo session <n>${C_N}  new/resume a session\n"
+    printf "  ${C_B}zyvo update${C_N}       delta update\n"
+    printf "  ${C_B}zyvo uninstall${C_N}    remove ZYVO (keeps projects)\n"
+    printf "\n  ${C_D}Open a new shell, then run:${C_N} ${C_B}zyvo${C_N}\n"
 }
-with open(dst, "w") as fh:
-    json.dump(base, fh, indent=2)
-    fh.write("\n")
-PY
-}
-install_config() {
-    mkdir -p "$CONFIG_DIR/agent" "$CONFIG_DIR/command" "$CONFIG_DIR/themes" "$CONFIG_DIR/skills"
-    if command -v python3 >/dev/null 2>&1 && [ -f "$SCRIPT_DIR/config/opencode.json" ]; then
-        merge_config
-    else
-        [ -f "$CONFIG_DIR/opencode.json" ] && cp -n "$CONFIG_DIR/opencode.json" "$CONFIG_DIR/opencode.json.bak" 2>/dev/null
-        install -m644 "$SCRIPT_DIR/config/opencode.json" "$CONFIG_DIR/opencode.json"
+
+# ------------------------------------------------------------
+# entry
+# ------------------------------------------------------------
+if [ "${1:-}" = "uninstall" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo "$PWD")"
+    if [ -f "$SCRIPT_DIR/scripts/zyvo-uninstall" ]; then
+        exec sh "$SCRIPT_DIR/scripts/zyvo-uninstall" "${@:2}"
     fi
-    install -m644 "$SCRIPT_DIR/config/tui.json" "$CONFIG_DIR/tui.json" 2>/dev/null || true
-    install -m644 "$SCRIPT_DIR/config/agent/"*.md "$CONFIG_DIR/agent/" 2>/dev/null || true
-    install -m644 "$SCRIPT_DIR/config/command/"*.md "$CONFIG_DIR/command/" 2>/dev/null || true
-    install -m644 "$SCRIPT_DIR/config/themes/"*.json "$CONFIG_DIR/themes/" 2>/dev/null || true
-    cp -rn "$SCRIPT_DIR/skills/"* "$CONFIG_DIR/skills/" 2>/dev/null || true
-    [ -f "$SCRIPT_DIR/scripts/oc-settings.sh" ] && install_script "$SCRIPT_DIR/scripts/oc-settings.sh" "$BIN_DIR/oc-settings"
-    return 0
-}
-spin "config + skills" install_config || warn "there was a problem copying config"
+    curl -fsSL --retry 2 --connect-timeout 15 --max-time 60 \
+        -o /tmp/zyvo-uninstall "https://raw.githubusercontent.com/$GH_REPO/main/scripts/zyvo-uninstall" \
+        && exec sh /tmp/zyvo-uninstall "${@:2}"
+    fatal "couldn't fetch the uninstaller" "Check your internet and rerun."
+fi
 
-RC_FILE="$HOME/.bashrc"
-[ "$ENV_KIND" != "termux" ] && [ ! -f "$HOME/.bashrc" ] && [ -f "$HOME/.profile" ] && RC_FILE="$HOME/.profile"
-if ! grep -q "OPENCODE_API_KEY\|OPENCODE_ZEN_API_KEY" "$RC_FILE" 2>/dev/null; then
-    printf '\n# ZYVO AI\nexport OPENCODE_API_KEY="%s"\n' "$DEFAULT_ZEN_KEY" >> "$RC_FILE"
-    say "AI provider configured (Zen, zero-config)"
-else
-    info "AI provider already configured"
-fi
-if ! grep -q 'ZYVO PATH' "$RC_FILE" 2>/dev/null; then
-    printf '# ZYVO PATH\ncase ":$PATH:" in *":%s:"*) ;; *) export PATH="%s:$PATH";; esac\n' \
-        "$BIN_DIR" "$BIN_DIR" >> "$RC_FILE"
-fi
-export OPENCODE_API_KEY="${OPENCODE_API_KEY:-$DEFAULT_ZEN_KEY}"
-
-N_CMD="$(ls -1 "$CONFIG_DIR/command"/*.md 2>/dev/null | wc -l | tr -d ' ')"
-N_SKILL="$(ls -1d "$CONFIG_DIR/skills"/*/ 2>/dev/null | wc -l | tr -d ' ')"
-say "config OK · ${N_CMD} commands · ${N_SKILL} skills"
-step_ok
-
-# ---------- [8] verify ----------
-step "verify"
-if [ "$ENV_KIND" = "termux" ]; then
-    for f in "$HOME/.opencode/bin/opencode" "$HOME/.opencode/bin/opencode.bak" "$PREFIX/bin/opencode.bak"; do
-        [ -e "$f" ] || continue
-        "$f" --version >/dev/null 2>&1 || mv "$f" "$f.bak.old" 2>/dev/null || true
-    done
-fi
-OTHER_ZYVO="$(command -v zyvo 2>/dev/null || true)"
-if [ -n "$OTHER_ZYVO" ] && [ "$OTHER_ZYVO" != "$BIN_DIR/zyvo" ]; then
-    warn "another 'zyvo' exists at: $OTHER_ZYVO — check your PATH"
-fi
-VERSION="$("$BIN_DIR/zyvo" --version 2>&1)" || fatal "zyvo is not running." "Rerun: bash install.sh"
-say "zyvo verified: $VERSION"
-step_ok
-
-# ---------- FINAL CARD ----------
-ELAPSED=$(( $(now) - INSTALL_START ))
-echo
-printf "  ${CYAN}╭────────────────────────────────────────────╮${RESET}\n"
-printf "  ${CYAN}│${RESET}  ${GREEN}${BOLD}⚡ ZYVO READY${RESET}                                ${CYAN}│${RESET}\n"
-printf "  ${CYAN}│${RESET}  ${DIM}%ss · %s/%s · %s${RESET}                     ${CYAN}│${RESET}\n" "$ELAPSED" "$ENV_KIND" "$ARCH" "$MODE"
-printf "  ${CYAN}├────────────────────────────────────────────┤${RESET}\n"
-printf "  ${CYAN}│${RESET}  ${BOLD}zyvo${RESET}                ${DIM}start AI (full-power)${RESET}   ${CYAN}│${RESET}\n"
-printf "  ${CYAN}│${RESET}  ${BOLD}zyvo session <name>${RESET}  ${DIM}new/resume session${RESET}     ${CYAN}│${RESET}\n"
-printf "  ${CYAN}│${RESET}  ${BOLD}zyvo update${RESET}          ${DIM}delta update check${RESET}      ${CYAN}│${RESET}\n"
-printf "  ${CYAN}│${RESET}  ${BOLD}/dekho /fix /review /model /zyvo${RESET}          ${CYAN}│${RESET}\n"
-printf "  ${CYAN}│${RESET}  ${DIM}version: %s · %s commands · %s skills${RESET}      ${CYAN}│${RESET}\n" "$VERSION" "$N_CMD" "$N_SKILL"
-printf "  ${CYAN}╰────────────────────────────────────────────╯${RESET}\n"
-if [ "$WARNINGS" -gt 0 ]; then
-    printf "\n  ${YELLOW}${BOLD}%d warning:${RESET}" "$WARNINGS"
-    printf "%b\n" "$SKIPPED"
-fi
-printf "\n  ${DIM}in a new shell:${RESET} source ~/.bashrc  ${DIM}then${RESET} ${BOLD}zyvo${RESET}\n\n"
+setup_env
+setup_deps
+setup_core
+setup_layer
+verify_install
+finish
