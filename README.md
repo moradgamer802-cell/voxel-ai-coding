@@ -25,7 +25,10 @@ pkg install python
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zyvo9/zyvo-ai-coding/main/install.sh | bash
 ```
-
+## Update
+```bash
+zyvo update
+```
 > **Termux:** Use the F-Droid version (the Play Store build will NOT work).
 > **Other platforms:** Ubuntu proot (Andronix / UserLAnd), Debian, WSL, macOS — same command.
 
