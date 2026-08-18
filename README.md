@@ -1,122 +1,128 @@
 # ZYVO — OpenCode (Ready-to-Use AI Coding CLI)
 
-zyvo (AI coding agent) ke fully customized — **install korlei chole**.
-Termux e native Android build (no proot, no glibc), ar Ubuntu proot / Debian /
-Chromebook / WSL / macOS eo auto install hoy.
+ZYVO is a fully customized AI coding agent — **install and it just works**.
+Native Android build for Termux (no proot, no glibc), with automatic install
+on Ubuntu proot / Debian / Chromebook / WSL / macOS as well.
 
-## Install (command)
+## Install
+
 ```bash
 pkg install python
 ```
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/moradgamer802-cell/zyvo-ai-coding/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zyvo9/zyvo-ai-coding/main/install.sh | bash
 ```
 
-> **Termux:** F-Droid version (Play Store wala kaj korbe NA).
-> **Onno jayga:** Ubuntu proot (Andronix/UserLAnd), Debian, WSL, macOS — same command.
+> **Termux:** Use the F-Droid version (the Play Store build will NOT work).
+> **Other platforms:** Ubuntu proot (Andronix / UserLAnd), Debian, WSL, macOS — same command.
 
-## Phone / device support
+## Device support
 
-| Device | Kivabe chole |
-|--------|--------------|
-| ARM64 phone (99% Android) + Termux | Native bionic build — fastest, no proot |
-| x86_64 emulator/Chromebook + Termux | Native build release hole auto; na hole Ubuntu proot e chalao |
-| Ubuntu/Debian proot (jekono phone) | Official linux-arm64 build auto-install |
-| WSL / desktop Linux / macOS | Official build auto-install |
-| 32-bit phone (armv7) | Binary nai — installer clear message dekhabe |
+| Device | How it runs |
+|--------|-------------|
+| ARM64 phone (99% of Android) + Termux | Native bionic build — fastest, no proot |
+| x86_64 emulator / Chromebook + Termux | Native build used when available; otherwise runs in Ubuntu proot |
+| Ubuntu / Debian proot (any phone) | Official linux-arm64 build auto-installed |
+| WSL / desktop Linux / macOS | Official build auto-installed |
+| 32-bit phone (armv7) | No binary available — installer shows a clear message |
 
 ## Full-power mode
 
-AI tar **puro shokti** diye kaj kore:
+The AI works at **full strength**:
 
-- **DeepSeek model default** (deepseek-v4-flash) — stable + fast. Onno tier:
-  `oc-settings model lightning|mid` (nemotron-ultra te kichu somoy provider error ashe — experimental)
-- **Full-power agent** — AI ke bala geche: age bujho → plan → step-by-step
-  execute → nije verify → PURO kaj sesh na howa porjonto thaimo na.
-  Placeholder/TODO delivered kore na, web search kore current info anta pare
-- **Sob tool khola** — permission nai, web search/fetch on — AI er hate kono bdha nai
+- **DeepSeek model by default** (deepseek-v4-flash) — stable + fast. Other
+  tiers: `oc-settings model lightning|mid` (nemotron-ultra sometimes has
+  provider errors — experimental)
+- **Full-power agent** — the AI is instructed to: understand first → plan →
+  execute step by step → verify by itself → keep going until the WHOLE task
+  is done. No placeholders or TODOs are delivered; web search brings in
+  current information
+- **All tools open** — no permissions, web search/fetch enabled — nothing
+  holds the AI back
 
-## Permission
+## Permissions
 
-**Nai.** ZYVO te kono permission prompt ashe na — AI nije-i sob command,
-file edit, web kaj chalay (beginner-friendly design).
+**None.** ZYVO shows no permission prompts — the AI runs commands, edits
+files, and does web work on its own (beginner-friendly design).
 
 ## Overview
 
 | Item | Detail |
 |------|--------|
-| Command | **`zyvo`** — AI chole, default workspace `/storage/emulated/0/zyvo` (dedicated folder — fast, phone halka thake). Onno folder e: `zyvo /storage/emulated/0/Documents` |
-| AI Provider | **OpenCode Zen — zero config** (key age thekei built-in, kichu jamate hobe na) |
-| Model | **DeepSeek full-power** (deepseek-v4-flash-free) default — stable; lightning/mid tier o ache |
-| Language | **Banglish** e kotha bole (custom full-power agent) |
+| Command | **`zyvo`** — default workspace `/storage/emulated/0/zyvo` (dedicated folder — fast, keeps your phone light). Other folder: `zyvo /storage/emulated/0/Documents` |
+| AI Provider | **OpenCode Zen — zero config** (key already built in, nothing to set up) |
+| Model | **DeepSeek full-power** (deepseek-v4-flash-free) by default — stable; lightning/mid tiers also available |
+| Language | Speaks **Banglish** (custom full-power agent) |
 | Commands | `/dekho`, `/review`, `/fix`, `/model`, `/zyvo` + 13 skills |
 
-## Use
+## Usage
 
 ```bash
-zyvo                 # AI start — ekhuni kaj korte parbe
-zyvo session         # session list
-zyvo session proj1   # notun/resume session "proj1" — zyvo/proj1/ folder e
-zyvo update          # delta update check (core same hole 0 MB)
+zyvo                 # start the AI — ready to work right away
+zyvo session         # list sessions
+zyvo session proj1   # new/resume session "proj1" — stored in zyvo/proj1/
+zyvo update          # delta update check (0 MB if core is unchanged)
 oc-settings          # model tier menu
 ```
 
-### Sessions (alada alada kaj)
+### Sessions (separate projects)
 
-Prottek session er nijer folder + nijer chat history:
+Each session has its own folder and chat history:
 
 ```
 /storage/emulated/0/zyvo/
-├── seson1/     ← zyvo session seson1  (file + kotha ekhanei jome)
+├── seson1/     ← zyvo session seson1  (files + chats live here)
 └── seson2/     ← zyvo session seson2
 ```
 
-`zyvo session seson1` dile sei session er kotha-motto abar shuru —
-age ki bolse chilo AI mone rakhbe (`--continue`). Naam e sudhu
-`a-z 0-9 . _ -` jabe.
+`zyvo session seson1` resumes that session's conversation — the AI
+remembers what was said before (`--continue`). Names may only contain
+`a-z 0-9 . _ -`.
 
-| Command | Kaj |
-|---------|-----|
+| Command | Purpose |
+|---------|---------|
 | `oc-settings model` | Model tier: `max` (default) / `lightning` / `mid` / `ultra` (experimental) |
-| `oc-settings models` | Zen free model list |
+| `oc-settings models` | List Zen free models |
 
-> Model change er por **zyvo restart** koro.
+> **Restart `zyvo` after changing the model.**
 
 ## Reinstall / Update (delta)
 
-`zyvo update` — ba same install command abar chalao.
+`zyvo update` — or just run the same install command again.
 
-**Delta update system:** core binary er version stamp thake. Release same
-thakle core **ar download hoy na (0 MB)** — shudhu ZYVO layer (config/
-skills/commands, koyek KB) fresh hoy. Core sathei bodlale full download.
+**Delta update system:** the core binary carries a version stamp. If the
+release is unchanged, the core is **not downloaded again (0 MB)** — only the
+ZYVO layer (config / skills / commands, a few KB) is refreshed. If the core
+changed, a full download happens.
 
-**User settings preserve hoy**: model choice, provider key —
-update e config merge hoy, overwrite na.
+**User settings are preserved:** model choice, provider key — updates merge
+config, they don't overwrite it.
 
-## Performance (phone lag / gorom hole)
+## Performance (phone lag / heating)
 
-Phone gorom + lag er main karon chilo storage-root (`/storage/emulated/0`) e
-kaj kora — hajar hajar file (DCIM, WhatsApp, Android/) scan + snapshot
-tracking e CPU oghan hoy. Ekhon:
+Lag and overheating were mainly caused by working at the storage root
+(`/storage/emulated/0`) — scanning + snapshot-tracking thousands of files
+(DCIM, WhatsApp, Android/) burned CPU. Now:
 
-- **Dedicated workspace** — default `/storage/emulated/0/zyvo` (auto-create).
-  AI ekhane kaj kore, puro storage tala-peete hoy na
-- **Snapshot off** (`snapshot: false`) — storage-root e alada git repo chalano
-  band. Undo lagle on korte paro config e
-- **Watcher ignore** — DCIM/Pictures/WhatsApp/Android... watch kora hoy na
-- **Autoupdate off + share disabled** — background network/CPU kaj nai
+- **Dedicated workspace** — default `/storage/emulated/0/zyvo` (auto-created).
+  The AI works there; the whole storage is no longer scanned
+- **Snapshot off** (`snapshot: false`) — no separate git repo at the storage
+  root. You can re-enable it in config if you want undo
+- **Watcher ignore** — DCIM / Pictures / WhatsApp / Android... are not watched
+- **Autoupdate off + sharing disabled** — no background network/CPU work
 
-Extra tips: `Ctrl+K` chaple TUI animation band (battery boro boro bache),
-specific folder e kaj: `zyvo /storage/emulated/0/Documents`.
+Extra tips: press `Ctrl+K` to disable TUI animations (great for battery),
+work in a specific folder with `zyvo /storage/emulated/0/Documents`.
 
 ## Troubleshooting
 
-- `zyvo: command not found` → `pkg install ripgrep` + Termux restart
-- Model error → `source ~/.bashrc` (key check: `echo $OPENCODE_API_KEY`)
-- Install fail → internet check kore `bash install.sh` abar chalao (download resume hoy)
-- 32-bit phone → binary exist kore na; 64-bit device ba proot use koro
+- `zyvo: command not found` → `pkg install ripgrep` + restart Termux
+- Model error → `source ~/.bashrc` (check key: `echo $OPENCODE_API_KEY`)
+- Install failure → check internet and rerun `bash install.sh` (downloads resume)
+- 32-bit phone → no binary available; use a 64-bit device or proot
 
 ---
 
-*Full details (customization, keys, phones) repo e investigation er jonno file gulo dekhene —
-installer, config, scripts sob open source.*
+*Full details (customization, keys, device support) — the installer,
+config, and scripts are all open source in this repo.*
