@@ -409,7 +409,7 @@ install_script() { # $1 src $2 dest — shebang rewritten for non-Termux
     fi
 }
 
-merge_json() { # $1 user config $2 repo config — add missing keys only
+merge_json() { # $1 user config $2 repo config — merge with force-keys
     local py
     if cmd_exists python3; then py=python3; else py=python; fi
     "$py" - "$1" "$2" <<'PY'
@@ -423,8 +423,13 @@ try:
     repo = json.load(open(repo_path))
 except Exception:
     repo = {}
+# these always come from the repo — ZYVO's core defaults must win
+# (model picker, provider, permissions), otherwise an old install
+# keeps its previous model forever
+FORCE = {"model", "small_model", "default_agent", "provider", "permission", "agent"}
 for k, v in repo.items():
-    user.setdefault(k, v)
+    if k in FORCE or k not in user:
+        user[k] = v
 json.dump(user, open(user_path, "w"), indent=2)
 PY
 }

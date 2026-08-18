@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "zyvo"
-version = "0.2.3"
+version = "0.2.4"
 description = "ZYVO — ready-to-use AI coding CLI (OpenCode) for Termux. One command, zero config."
 readme = "README.md"
 requires-python = ">=3.8"

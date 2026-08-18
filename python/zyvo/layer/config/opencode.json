@@ -14,6 +14,19 @@
   "model": "zyvo/deepseek-v4-flash-free",
   "small_model": "zyvo/laguna-s-2.1-free",
   "default_agent": "build",
+  "agent": {
+    "build": {
+      "temperature": 0.5,
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "webfetch": "allow",
+        "websearch": "allow",
+        "external_directory": "allow",
+        "doom_loop": "allow"
+      }
+    }
+  },
   "snapshot": false,
   "autoupdate": false,
   "share": "disabled",
