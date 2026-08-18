@@ -41,6 +41,47 @@ if [ "${1:-}" = "update" ] || [ "${1:-}" = "upgrade" ]; then
     exit 1
 fi
 
+# ---- zyvo uninstall: removes ZYVO cleanly (needs the repo script) ----
+if [ "${1:-}" = "uninstall" ]; then
+    shift
+    UNINSTALLER_URL="https://raw.githubusercontent.com/zyvo9/zyvo-ai-coding/main/scripts/zyvo-uninstall"
+    UNINSTALLER=""
+    # prefer a local copy (installed layout), else the current repo
+    for c in "$dir/../share/zyvo/scripts/zyvo-uninstall" "$dir/zyvo-uninstall" "$TMPDIR/zyvo-uninstall"; do
+        if [ -f "$c" ]; then UNINSTALLER="$c"; break; fi
+    done
+    if [ -z "$UNINSTALLER" ]; then
+        if curl -fsSL --retry 2 --connect-timeout 15 --max-time 60 -o "$TMPDIR/zyvo-uninstall" "$UNINSTALLER_URL" 2>/dev/null; then
+            UNINSTALLER="$TMPDIR/zyvo-uninstall"
+        fi
+    fi
+    if [ -n "$UNINSTALLER" ]; then
+        exec sh "$UNINSTALLER" "$@"
+    fi
+    echo "zyvo: could not fetch the uninstaller — check your internet" >&2
+    exit 1
+fi
+
+# ---- zyvo preview <dir>: local server + open in the default browser ----
+# Browsers block scripts/fetch/CSS on file:// URLs, so HTML opened directly
+# from the file manager often shows a blank page. Serving over http:// fixes it.
+if [ "${1:-}" = "preview" ] || [ "${1:-}" = "open" ]; then
+    PREVIEW_DIR="${2:-$PWD}"
+    [ -d "$PREVIEW_DIR" ] || { echo "zyvo: no such folder: $PREVIEW_DIR" >&2; exit 1; }
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "zyvo: python3 is required for the local server — install it (pkg install python)" >&2
+        exit 1
+    fi
+    PORT="${ZYVO_PREVIEW_PORT:-8080}"
+    echo "zyvo: serving $PREVIEW_DIR → http://localhost:$PORT"
+    echo "      (opens automatically; Ctrl+C stops the server)"
+    ( sleep 1.5; command -v termux-open-url >/dev/null 2>&1 \
+        && termux-open-url "http://localhost:$PORT/" \
+        || command -v xdg-open >/dev/null 2>&1 && xdg-open "http://localhost:$PORT/" ) &
+    cd "$PREVIEW_DIR" || exit 1
+    exec python3 -m http.server "$PORT" --bind 127.0.0.1
+fi
+
 # ---- args: named session (legacy permission flags silently ignored) ----
 SESSION_MODE=0
 SESSION_NAME=""

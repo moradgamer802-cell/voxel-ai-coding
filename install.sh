@@ -145,6 +145,7 @@ banner() {
 
 MODE="install"
 command -v zyvo >/dev/null 2>&1 && MODE="update"
+[ "${1:-}" = "uninstall" ] && exec sh "$(dirname "$0")/scripts/zyvo-uninstall" "${@:2}"
 
 banner
 
@@ -486,6 +487,7 @@ else
     say "core installed → $LIBEXEC_DIR/opencode.bin"
 fi
 [ -f "$SCRIPT_DIR/scripts/zyvo-menu" ] && install_script "$SCRIPT_DIR/scripts/zyvo-menu" "$BIN_DIR/zyvo-menu"
+[ -f "$SCRIPT_DIR/scripts/zyvo-uninstall" ] && install_script "$SCRIPT_DIR/scripts/zyvo-uninstall" "$BIN_DIR/zyvo-uninstall"
 step_ok
 
 # ---------- [7] config + skills + provider ----------
