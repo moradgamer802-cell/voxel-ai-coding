@@ -69,7 +69,7 @@ files, and does web work on its own (beginner-friendly design).
 | AI Provider | **OpenCode Zen — zero config** (key already built in, nothing to set up) |
 | Model | **DeepSeek full-power** (deepseek-v4-flash-free) by default — stable; lightning/mid tiers also available |
 | Language | Speaks **Banglish** (custom full-power agent) |
-| Commands | `/dekho`, `/review`, `/fix`, `/model`, `/zyvo` + 13 skills |
+| Commands | `/dekho`, `/review`, `/fix`, `/model`, `/zyvo`, `/open` + 19 skills |
 
 ## Usage
 
@@ -78,6 +78,8 @@ zyvo                 # start the AI — ready to work right away
 zyvo session         # list sessions
 zyvo session proj1   # new/resume session "proj1" — stored in zyvo/proj1/
 zyvo update          # delta update check (0 MB if core is unchanged)
+zyvo preview         # local server + auto-open any page in the browser
+zyvo uninstall       # cleanly remove ZYVO (keeps your projects)
 oc-settings          # model tier menu
 ```
 
