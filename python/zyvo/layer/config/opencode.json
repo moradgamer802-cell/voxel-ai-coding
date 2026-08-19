@@ -16,6 +16,7 @@
   "default_agent": "build",
   "agent": {
     "build": {
+      "model": "zyvo/deepseek-v4-flash-free",
       "temperature": 0.5,
       "permission": {
         "bash": "allow",
