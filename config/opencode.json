@@ -11,12 +11,9 @@
       }
     }
   },
-  "model": "deepseek-v4-flash-free",
-  "small_model": "laguna-s-2.1-free",
   "default_agent": "build",
   "agent": {
     "build": {
-      "model": "deepseek-v4-flash-free",
       "temperature": 0.5,
       "permission": {
         "bash": "allow",

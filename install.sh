@@ -424,12 +424,16 @@ try:
 except Exception:
     repo = {}
 # these always come from the repo — ZYVO's core defaults must win
-# (model picker, provider, permissions), otherwise an old install
-# keeps its previous model forever
-FORCE = {"model", "small_model", "default_agent", "provider", "permission", "agent"}
+# (provider, permissions), otherwise an old install keeps stale values
+FORCE = {"provider", "permission", "agent"}
 for k, v in repo.items():
     if k in FORCE or k not in user:
         user[k] = v
+# model defaults are intentionally NOT forced — ZYVO uses whatever model
+# the user picked (opencode's own default). Remove stale deepseek keys
+# left by older versions so the picker falls back to the stock default.
+for k in ("model", "small_model"):
+    user.pop(k, None)
 json.dump(user, open(user_path, "w"), indent=2)
 PY
 }
