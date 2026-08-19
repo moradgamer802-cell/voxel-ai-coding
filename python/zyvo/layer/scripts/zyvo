@@ -146,6 +146,72 @@ elif [ "$#" -eq 0 ] && [ "$PWD" = "$HOME" ]; then
     fi
 fi
 
+# ---- ghost-config self-heal ----
+# Old ZYVO versions wrote model ids in a format opencode rejects
+# ("deepseek-v4-flash-free" bare → popup "…/ is not valid"). Those keys
+# can survive in global config, the workspace project dir, or project
+# .opencode/ agent files — strip them on every launch so the picker
+# falls back to the stock default. Fast, silent, safe.
+if command -v python3 >/dev/null 2>&1; then
+    python3 - "$HOME" "${WS_BASE:-$HOME}" >/dev/null 2>&1 <<'PYGC' || true
+import json, os, sys
+home, base = sys.argv[1], sys.argv[2]
+roots = [
+    os.path.join(home, ".config", "opencode"),
+    os.path.join(base, "zyvo"),
+    os.path.join(base, ".opencode"),
+]
+def clean_json(p):
+    try:
+        d = json.load(open(p))
+    except Exception:
+        return
+    if not isinstance(d, dict):
+        return
+    ch = False
+    for k in ("model", "small_model"):
+        if k in d:
+            del d[k]; ch = True
+    a = d.get("agent")
+    if isinstance(a, dict) and isinstance(a.get("build"), dict) and "model" in a["build"]:
+        del a["build"]["model"]; ch = True
+    if ch:
+        try:
+            json.dump(d, open(p, "w"), indent=2)
+        except Exception:
+            pass
+def clean_md(p):
+    try:
+        lines = open(p).readlines()
+    except Exception:
+        return
+    out = [l for l in lines if not l.startswith("model:")]
+    if len(out) != len(lines):
+        try:
+            open(p, "w").writelines(out)
+        except Exception:
+            pass
+for root in roots:
+    if not os.path.isdir(root):
+        continue
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames
+                       if d not in ("node_modules", ".git", "skills", "themes")]
+        if dirpath.count(os.sep) - root.count(os.sep) > 3:
+            dirnames[:] = []
+            continue
+        for fn in filenames:
+            p = os.path.join(dirpath, fn)
+            if fn in ("opencode.json", "opencode.jsonc"):
+                clean_json(p)
+            elif fn == "config.json" and ".opencode" in dirpath:
+                clean_json(p)
+            elif fn.endswith(".md") and (".opencode" in dirpath or
+                    dirpath.endswith(os.sep + "agent") or dirpath.endswith("/agent")):
+                clean_md(p)
+PYGC
+fi
+
 # Set the terminal title so the toolbar shows ZYVO
 if ( : >/dev/tty ) 2>/dev/null; then printf '\033]0;ZYVO\007' >/dev/tty 2>/dev/null; fi
 
