@@ -378,6 +378,27 @@ setup_layer() {
     else
         [ -f "$CONFIG_DIR/opencode.json" ] || cp -f "$TMP/config/opencode.json" "$CONFIG_DIR/opencode.json"
     fi
+    # also strip stale model keys from opencode.jsonc (oc-settings writes both)
+    if sys_has_python && [ -f "$CONFIG_DIR/opencode.jsonc" ]; then
+        if cmd_exists python3; then _py=python3; else _py=python; fi
+        "$_py" - "$CONFIG_DIR/opencode.jsonc" <<'PYC' 2>/dev/null || true
+import json, sys
+p = sys.argv[1]
+try:
+    d = json.load(open(p))
+except Exception:
+    sys.exit(0)
+c = False
+for k in ("model", "small_model"):
+    if k in d:
+        del d[k]; c = True
+a = d.get("agent")
+if isinstance(a, dict) and isinstance(a.get("build"), dict) and "model" in a["build"]:
+    del a["build"]["model"]; c = True
+if c:
+    json.dump(d, open(p, "w"), indent=2)
+PYC
+    fi
     [ -f "$TMP/config/tui.json" ] && cp -f "$TMP/config/tui.json" "$CONFIG_DIR/tui.json" 2>/dev/null || true
     cp -f "$TMP"/config/agent/*.md    "$CONFIG_DIR/agent/"   2>/dev/null || true
     cp -f "$TMP"/config/command/*.md  "$CONFIG_DIR/command/" 2>/dev/null || true
