@@ -46,6 +46,24 @@ not the framework.
 
 ---
 
+## ⚡ Fast Mode: Local Video Folder Drop (Zero-Config — Recommended on Mobile/Termux)
+
+When the user already has video clips (generated from any web AI tool like Kling AI, Luma Dream Machine, Runway, Minimax Hailuo, Pika, or saved in phone folders e.g. `videos/`, `assets/`, `Download/`):
+
+1. **Scan Videos:** Find all video files (`.mp4`, `.webm`, `.mov`) in the specified folder, ordered by name/time.
+2. **Extract Posters (if ffmpeg exists):**
+   ```bash
+   ffmpeg -ss 0 -i video1.mp4 -frames:v 1 -q:v 2 video1_poster.webp
+   ```
+3. **Build HTML & Engine:**
+   - Create `index.html`, `style.css`, and copy `references/scrub-engine.js`.
+   - Wire the videos into `sections` with matching section titles, captions, tags, and accent colors.
+4. **Auto Launch:**
+   - Execute `zyvo preview .` (starts background server, auto-opens in phone browser, and generates temporary public live link).
+   - Instant 3D scroll world ready in seconds without any cloud CLI/API keys!
+
+---
+
 ## Step 0 — Bootstrap
 
 1. **Monid CLI — the default video-chain backend.** Check `monid --version`,
@@ -163,26 +181,10 @@ default. Cover:
      a "mobile version," it's just the page not breaking when a phone visits — so a
      desktop-only build still degrades gracefully.
 
-7. **Asset source — automatic or manual. ALWAYS ask; it decides who renders.**
-   Two options (`AskUserQuestion` in Claude Code; a plain either/or elsewhere):
-   *"How do you want to produce the stills and clips — should I generate them, or
-   do you want the prompts to render in tools of your choice?"* Record as
-   `ASSET_SOURCE`.
-   - **Automatic (default)** — the skill renders everything itself: stills via
-     Higgsfield `gpt_image_2` (or Codex `image_gen`), the video chain via Monid
-     with Higgsfield as fallback biller. Item 8 prices this path.
-   - **Manual** — the skill writes every prompt to a file (`still_<name>.txt` at
-     Step 2, `dive_<name>.txt` at Step 4, `conn_<i>.txt` at Step 5) plus the exact
-     conditioning frames each clip must start/end on; the user copy-pastes the
-     prompts into tools of their choice (any image tool for the stills; a
-     start/end-frame-capable video tool for the clips) and drops the finished
-     files into `$WORK`. The skill validates what comes back (count, dimensions,
-     aspect, duration, seam frames) and continues the same downstream pipeline —
-     only the render calls change. State the one hard requirement up front: the
-     seamless rule still applies, so their **video** tool must accept a
-     first/start frame (both architectures) and, for architecture B connectors, a
-     last/end frame — if it can't, steer `CAMERA` to architecture A or have them
-     pick a tool that can (Steps 4–5).
+7. **Asset source — local folder, automatic, or manual.**
+   - **Local folder drop (Fastest / Recommended on mobile/Termux)** — the user already has videos in a directory (`videos/`, `assets/`, or `Download/`). The skill auto-scans them, generates posters, sets up `scrub-engine.js`, and launches preview immediately. Zero API keys or cloud CLI needed.
+   - **Automatic** — the skill renders everything via CLI: stills via Higgsfield `gpt_image_2` (or Codex), video chain via Monid (Seedance 2.0).
+   - **Manual prompts** — the skill writes prompt files + conditioning frames for the user to render externally.
 
 8. **Budget — engines shown by cost, decided before anything renders.** On the
    **manual** path (item 7) there is nothing to bill here — the spend happens in
