@@ -71,15 +71,12 @@ fi
 if [ "${1:-}" = "preview" ] || [ "${1:-}" = "open" ] || [ "${1:-}" = "share" ] || [ "${1:-}" = "public" ]; then
     CMD_TYPE="$1"
     shift
-    SHARE_MODE=0
-    if [ "$CMD_TYPE" = "share" ] || [ "$CMD_TYPE" = "public" ]; then
-        SHARE_MODE=1
-    fi
+    SHARE_MODE=1
     PREVIEW_DIR=""
     while [ "$#" -gt 0 ]; do
         case "$1" in
+            --local|-l|--no-share) SHARE_MODE=0; shift ;;
             --share|-s|--public|-p) SHARE_MODE=1; shift ;;
-            --local|-l) SHARE_MODE=0; shift ;;
             *) [ -z "$PREVIEW_DIR" ] && PREVIEW_DIR="$1"; shift ;;
         esac
     done
