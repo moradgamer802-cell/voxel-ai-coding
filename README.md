@@ -1,4 +1,4 @@
-# ZYVO — OpenCode (Ready-to-Use AI Coding CLI)
+# ZYVO — Ai (Ready-to-Use AI Coding CLI)
 
 <div align="center">
 
