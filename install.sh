@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 # ============================================================
 #  ZYVO — one-line installer
 #  Install: curl -fsSL https://raw.githubusercontent.com/
@@ -28,8 +28,19 @@ OPENCODE_INSTALL_URL="https://opencode.ai/install"
 AARCH64_MATCH="android-aarch64"
 
 PREFIX="${PREFIX:-}"
-if [ -n "$PREFIX" ] && [ -x "$PREFIX/bin/pkg" ]; then
+# Termux detection is intentionally broad: some devices/ROMs start the
+# installer without PREFIX exported, or with pkg missing from PATH.
+TERMUX_ROOT="/data/data/com.termux/files/usr"
+if [ -z "$PREFIX" ] && [ -d "$TERMUX_ROOT" ]; then
+    PREFIX="$TERMUX_ROOT"
+    export PREFIX
+fi
+if [ -n "$TERMUX_VERSION" ] || { [ -n "$PREFIX" ] && [ -d "$PREFIX/bin" ] && \
+   { [ -x "$PREFIX/bin/pkg" ] || [ -x "$PREFIX/bin/apt" ] || [ -d "$PREFIX/etc/termux" ]; }; }; then
     ENV_KIND="termux"
+elif [ "$(uname -o 2>/dev/null)" = "Android" ]; then
+    # Android shell outside Termux (adb, other terminal apps)
+    ENV_KIND="android"
 else
     case "$(uname -s)" in
         Linux)  ENV_KIND="linux" ;;
@@ -37,7 +48,16 @@ else
         *)      ENV_KIND="unknown" ;;
     esac
 fi
-ARCH="$(uname -m)"
+
+RAW_ARCH="$(uname -m)"
+# Normalize the many names Android/Termux report for the same CPU.
+case "$RAW_ARCH" in
+    aarch64|arm64|armv8b|armv8|arm64-v8a) ARCH="aarch64" ;;
+    armv8l|armv7l|armv7|armv7a|arm|armhf|armeabi-v7a) ARCH="arm" ;;   # 32-bit userland
+    x86_64|amd64) ARCH="x86_64" ;;
+    i686|i386|x86) ARCH="i686" ;;
+    *) ARCH="$RAW_ARCH" ;;
+esac
 
 TMP="$(mktemp -d)"
 LOG="$TMP/install.log"
@@ -215,18 +235,23 @@ setup_env() {
     case "$ENV_KIND" in
         termux)
             BIN_DIR="$PREFIX/bin"; STAMP_DIR="$PREFIX/libexec/opencode"; LIB_DIR="$PREFIX/lib";;
-        linux|macos)
+        linux|macos|android)
             BIN_DIR="$HOME/.local/bin"; STAMP_DIR="$HOME/.local/libexec/zyvo"; LIB_DIR="$HOME/.local/lib/zyvo"
             mkdir -p "$BIN_DIR" "$STAMP_DIR" "$LIB_DIR";;
         *)
             fatal "unsupported OS: $(uname -s)" "Run inside Termux (Android), Linux, or macOS."
             ;;
     esac
+    # No hard stop for 32-bit / uncommon CPUs any more: those devices fall
+    # back to the Node (npm) build of the core, which is architecture neutral.
     case "$ARCH" in
-        aarch64|arm64|x86_64|amd64) : ;;
-        *) fatal "unsupported arch: $ARCH" "64-bit device (arm64/x86_64) or Ubuntu proot required." ;;
+        aarch64|x86_64) NATIVE_CORE=1 ;;
+        *)
+            NATIVE_CORE=0
+            printf "\r\033[K  ${C_Y}!${C_N} %s CPU has no native core build — using the Node build\n" "$RAW_ARCH"
+            ;;
     esac
-    status "environment ok ($ENV_KIND/$ARCH)"
+    status "environment ok ($ENV_KIND/$RAW_ARCH)"
     bump 2
 }
 
@@ -244,6 +269,8 @@ setup_deps() {
     if [ -n "$MISSING" ]; then
         if [ "$ENV_KIND" = "termux" ] && cmd_exists pkg && [ "$(id -u)" != "0" ]; then
             run_bg "installing deps (pkg)" pkg install -y $MISSING || warn_deps "$MISSING"
+        elif [ "$ENV_KIND" = "termux" ] && cmd_exists apt-get; then
+            run_bg "installing deps (apt)" apt-get install -y $MISSING || warn_deps "$MISSING"
         elif [ "$ENV_KIND" = "linux" ] && cmd_exists apt-get; then
             run_bg "installing deps (apt)" apt-get install -y $MISSING || warn_deps "$MISSING"
         else
@@ -262,7 +289,41 @@ warn_deps() {
 # ------------------------------------------------------------
 # Step 3 — core engine (delta aware)
 # ------------------------------------------------------------
+setup_core_npm() { # architecture-neutral fallback (32-bit ARM, x86, odd ROMs)
+    status "preparing Node core (no native build for $RAW_ARCH)"
+    if ! cmd_exists node || ! cmd_exists npm; then
+        if [ "$ENV_KIND" = "termux" ] && cmd_exists pkg; then
+            run_bg "installing nodejs" pkg install -y nodejs-lts || true
+        elif cmd_exists apt-get; then
+            run_bg "installing nodejs" apt-get install -y nodejs npm || true
+        fi
+    fi
+    cmd_exists npm || fatal "node/npm not available for $RAW_ARCH" \
+        "Install Node (pkg install nodejs-lts) and rerun the installer."
+
+    mkdir -p "$BIN_DIR" "$STAMP_DIR" "$LIB_DIR"
+    run_bg "installing core (npm)" npm install -g opencode-ai \
+        || fatal "npm core install failed" "Check your internet, then rerun."
+
+    local target
+    target="$(command -v opencode 2>/dev/null || true)"
+    [ -n "$target" ] || target="$(npm root -g 2>/dev/null)/opencode-ai/bin/opencode"
+    [ -e "$target" ] || fatal "core binary missing after npm install" \
+        "Run: npm install -g opencode-ai  and check its output."
+
+    # shim so every launcher path keeps working unchanged
+    printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$target" > "$STAMP_DIR/opencode.bin"
+    chmod 755 "$STAMP_DIR/opencode.bin"
+    printf 'npm' > "$STAMP_DIR/zyvo-core-kind"
+    status "core installed (node build)"
+    bump 70
+}
+
 setup_core() {
+    if [ "${NATIVE_CORE:-1}" != "1" ]; then
+        setup_core_npm
+        return
+    fi
     if [ "$ENV_KIND" = "termux" ]; then
         local tag installed zip_url
         status "checking core version"
@@ -276,14 +337,23 @@ setup_core() {
         fi
         [ -n "$installed" ] && status "core update: $installed → ${tag:-latest}"
 
-        zip_url="$(json_asset_url "$CORE_API/releases/latest" "$AARCH64_MATCH")"
-        if [ -z "$zip_url" ] && { [ "$ARCH" = "x86_64" ] || [ "$ARCH" = "amd64" ]; }; then
+        if [ "$ARCH" = "x86_64" ]; then
             zip_url="$(json_asset_url "$CORE_API/releases/latest" "android-x86_64")"
+            [ -n "$zip_url" ] || zip_url="$(json_asset_url "$CORE_API/releases/latest" "$AARCH64_MATCH")"
+        else
+            zip_url="$(json_asset_url "$CORE_API/releases/latest" "$AARCH64_MATCH")"
         fi
-        [ -n "$zip_url" ] || fatal "no Android core build in the latest release" "Try later, or use Ubuntu proot for a Linux build."
+        if [ -z "$zip_url" ]; then
+            # release has no matching Android build — stay installable
+            setup_core_npm
+            return
+        fi
 
-        download_file "$zip_url" "$TMP/core.zip" "downloading core" \
-            || fatal "download failed" "Check your internet and rerun (resume supported)."
+        if ! download_file "$zip_url" "$TMP/core.zip" "downloading core"; then
+            printf "\r\033[K  ${C_Y}!${C_N} native core download failed — trying the Node build\n"
+            setup_core_npm
+            return
+        fi
 
         # checksum when available
         if curl -fsSL --retry 2 --connect-timeout 10 --max-time 30 -o "$TMP/SHA256SUMS" "${zip_url%/*}/SHA256SUMS" 2>/dev/null; then
@@ -308,7 +378,15 @@ setup_core() {
             [ -f "$TMP/$lib" ] && install -m644 "$TMP/$lib" "$LIB_DIR/$lib" 2>/dev/null || true
         done
         [ -e "$PREFIX/bin/opencode" ] && mv "$PREFIX/bin/opencode" "$PREFIX/bin/opencode.bak" 2>/dev/null || true
+        # last safety net: some 32-bit/older kernels cannot exec the native
+        # binary even when the CPU name looked right — fall back silently.
+        if ! "$STAMP_DIR/opencode.bin" --version >/dev/null 2>&1; then
+            printf "\r\033[K  ${C_Y}!${C_N} native core cannot run on this device — using the Node build\n"
+            setup_core_npm
+            return
+        fi
         [ -n "$tag" ] && printf '%s' "$tag" > "$STAMP_DIR/zyvo-core-version"
+        printf 'native' > "$STAMP_DIR/zyvo-core-kind"
         status "core installed"
         bump 70
     else
