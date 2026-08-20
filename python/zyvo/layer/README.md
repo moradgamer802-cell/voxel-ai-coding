@@ -83,6 +83,7 @@ files, and does web work on its own (beginner-friendly design).
 | Command | **`zyvo`** — opens `default/` project. `zyvo coffee-shop` → opens/creates `zyvo/coffee-shop/` project folder |
 | AI Provider | **OpenCode Zen — zero config** (key already built in, nothing to set up) |
 | Model | **DeepSeek full-power** (deepseek-v4-flash-free) by default — stable; lightning/mid tiers also available |
+| Vision Eyes | **Built-in Gemini Flash Bridge** — AI can automatically see images, screenshots & video frames! |
 | Language | Speaks **Banglish** (custom full-power agent) |
 | Commands | `/dekho`, `/review`, `/fix`, `/model`, `/yolo`, `/zyvo`, `/open` + 20 skills |
 
@@ -92,9 +93,10 @@ files, and does web work on its own (beginner-friendly design).
 zyvo                   # start AI in zyvo/default/ project
 zyvo coffee-shop       # open/create zyvo/coffee-shop/ project folder
 zyvo ls                # list all project folders
-zyvo update            # delta update check (0 MB if core is unchanged)
 zyvo preview           # local preview + auto-open in browser (http://localhost:8080)
 zyvo share             # instant live Public HTTPS link (share with anyone on phone/PC)
+zyvo setup-vision      # set custom Gemini Vision key (built-in free key already active!)
+zyvo update            # delta update check (0 MB if core is unchanged)
 zyvo uninstall         # cleanly remove ZYVO (keeps your projects)
 oc-settings            # model tier menu
 ```

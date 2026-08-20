@@ -90,6 +90,32 @@ To apply a skill, **read its SKILL.md first** (find it with
 `skills/<name>/SKILL.md`), then follow its instructions for that task.
 - For `lets-scroll`: Setup the base website structure first, generate copy-pasteable AI video prompts in chat for the user, and wire their `.mp4` videos from `videos/` into `scrub-engine.js`.
 
+## 🔮 Vision (seeing images & videos)
+
+You have a **vision tool** — `zyvo-vision` — that lets you see images and videos.
+It uses Google Gemini Flash (FREE, built-in key, zero config).
+
+**When to use it automatically:**
+- User mentions/references an image file (`.jpg`, `.png`, `.webp`, `.gif`)
+- User mentions/references a video file (`.mp4`, `.mov`, `.webm`)
+- User says "dekho", "see this", "check this image/screenshot/video"
+- User asks about UI, design, errors from a screenshot
+- User drops a file path that is an image or video
+
+**How to call it:**
+```bash
+zyvo-vision /path/to/image.jpg                          # describe image
+zyvo-vision /path/to/image.jpg "what error is shown?"   # custom prompt
+zyvo-vision /path/to/video.mp4                          # analyze video frames
+zyvo-vision /path/to/video.mp4 "describe the scene"     # custom video prompt
+```
+
+**Rules:**
+- Call `zyvo-vision` yourself — do NOT ask the user to run it
+- Read the output and use it to answer the user's question
+- For errors/bugs in screenshots: describe the error and provide the fix
+- For design screenshots: describe the layout and recreate it in code
+
 ## When stuck
 - Read the full error message — then decide
 - If two attempts fail: try a different approach

@@ -1,0 +1,162 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# zyvo-vision — Vision bridge for ZYVO CLI
+# Uses Google Gemini Flash (FREE) to describe images/videos
+# Usage: zyvo-vision <file> [prompt]
+# Supports: .jpg .png .webp .gif .mp4 .mov .webm
+
+set -e
+
+VISION_KEY_FILE="${HOME}/.config/zyvo/vision.key"
+_ZYVO_B64_KEY="QVEuQWI4Uk42THJiZ2JKVllab3lBc3Z2VWp3dG4wanVBR01VVnhpS3RJQ2haSW9JdTF4OXc="
+VISION_KEY="${GEMINI_API_KEY:-}"
+
+# Load key: env > saved file > built-in default
+if [ -z "$VISION_KEY" ] && [ -f "$VISION_KEY_FILE" ]; then
+    VISION_KEY="$(cat "$VISION_KEY_FILE" | tr -d '[:space:]')"
+fi
+if [ -z "$VISION_KEY" ]; then
+    VISION_KEY="$(printf '%s' "$_ZYVO_B64_KEY" | base64 -d 2>/dev/null || printf '%s' "$_ZYVO_B64_KEY" | base64 -D 2>/dev/null || true)"
+fi
+
+if [ -z "$VISION_KEY" ]; then
+    echo "❌ Vision not configured. Run: zyvo setup-vision"
+    echo "   Get your FREE key: https://aistudio.google.com/apikey"
+    exit 1
+fi
+
+FILE="$1"
+PROMPT="${2:-Describe this image in detail. Include all text, UI elements, errors, colors, layout, and any notable details.}"
+
+if [ -z "$FILE" ]; then
+    echo "Usage: zyvo-vision <image-or-video> [prompt]"
+    echo "Supports: jpg png webp gif mp4 mov webm"
+    exit 1
+fi
+
+if [ ! -f "$FILE" ]; then
+    echo "❌ File not found: $FILE"
+    exit 1
+fi
+
+# Detect mime type
+EXT="${FILE##*.}"
+EXT="$(echo "$EXT" | tr '[:upper:]' '[:lower:]')"
+IS_VIDEO=0
+
+case "$EXT" in
+    jpg|jpeg) MIME="image/jpeg" ;;
+    png)      MIME="image/png" ;;
+    webp)     MIME="image/webp" ;;
+    gif)      MIME="image/gif" ;;
+    mp4)      MIME="video/mp4"; IS_VIDEO=1 ;;
+    mov)      MIME="video/quicktime"; IS_VIDEO=1 ;;
+    webm)     MIME="video/webm"; IS_VIDEO=1 ;;
+    *)        echo "❌ Unsupported format: .$EXT"; exit 1 ;;
+esac
+
+TMPDIR="${TMPDIR:-/tmp}"
+
+# For videos: extract 3 key frames and analyze those
+if [ "$IS_VIDEO" = 1 ]; then
+    if command -v ffmpeg >/dev/null 2>&1; then
+        FRAMES_DIR="$TMPDIR/zyvo-vision-frames-$$"
+        mkdir -p "$FRAMES_DIR"
+
+        # Get video duration
+        DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$FILE" 2>/dev/null || echo "6")
+        DURATION="${DURATION%.*}"
+        [ -z "$DURATION" ] || [ "$DURATION" -le 0 ] 2>/dev/null && DURATION=6
+
+        # Extract 3 frames: start, middle, near-end
+        T1=0
+        T2=$((DURATION / 2))
+        T3=$((DURATION - 1))
+        [ "$T3" -le 0 ] && T3=0
+
+        ffmpeg -ss "$T1" -i "$FILE" -frames:v 1 -q:v 2 "$FRAMES_DIR/frame1.jpg" -y 2>/dev/null
+        ffmpeg -ss "$T2" -i "$FILE" -frames:v 1 -q:v 2 "$FRAMES_DIR/frame2.jpg" -y 2>/dev/null
+        ffmpeg -ss "$T3" -i "$FILE" -frames:v 1 -q:v 2 "$FRAMES_DIR/frame3.jpg" -y 2>/dev/null
+
+        # Combine frame descriptions
+        RESULT=""
+        for i in 1 2 3; do
+            FPATH="$FRAMES_DIR/frame${i}.jpg"
+            [ -f "$FPATH" ] || continue
+            B64=$(base64 -w 0 "$FPATH" 2>/dev/null || base64 "$FPATH" 2>/dev/null)
+            FPROMPT="This is frame $i of 3 from a video. $PROMPT"
+
+            RESP=$(curl -s -X POST \
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$VISION_KEY" \
+                -H "Content-Type: application/json" \
+                -d "{
+                    \"contents\": [{
+                        \"parts\": [
+                            {\"text\": \"$FPROMPT\"},
+                            {\"inline_data\": {\"mime_type\": \"image/jpeg\", \"data\": \"$B64\"}}
+                        ]
+                    }]
+                }" 2>/dev/null)
+
+            TEXT=$(echo "$RESP" | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    print(d['candidates'][0]['content']['parts'][0]['text'])
+except:
+    print('[Frame $i: could not analyze]')
+" 2>/dev/null)
+            RESULT="${RESULT}--- Frame $i (${T1}s / ${T2}s / ${T3}s) ---
+${TEXT}
+
+"
+            case "$i" in
+                1) T_LABEL="start" ;;
+                2) T_LABEL="middle" ;;
+                3) T_LABEL="end" ;;
+            esac
+        done
+
+        rm -rf "$FRAMES_DIR"
+        echo "🎬 Video Analysis ($FILE, ${DURATION}s):"
+        echo ""
+        echo "$RESULT"
+        exit 0
+    else
+        echo "❌ ffmpeg required for video analysis. Install: pkg install ffmpeg"
+        exit 1
+    fi
+fi
+
+# For images: direct API call
+B64=$(base64 -w 0 "$FILE" 2>/dev/null || base64 "$FILE" 2>/dev/null)
+
+RESP=$(curl -s -X POST \
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$VISION_KEY" \
+    -H "Content-Type: application/json" \
+    -d "{
+        \"contents\": [{
+            \"parts\": [
+                {\"text\": \"$PROMPT\"},
+                {\"inline_data\": {\"mime_type\": \"$MIME\", \"data\": \"$B64\"}}
+            ]
+        }]
+    }" 2>/dev/null)
+
+TEXT=$(echo "$RESP" | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    print(d['candidates'][0]['content']['parts'][0]['text'])
+except Exception as e:
+    # Try to get error message
+    try:
+        d = json.load(open('/dev/stdin')) if False else json.loads(sys.stdin.read()) if False else d
+        err = d.get('error', {}).get('message', str(e))
+        print(f'❌ API Error: {err}')
+    except:
+        print(f'❌ Could not parse response: {e}')
+" 2>/dev/null)
+
+echo "📷 Image Analysis ($FILE):"
+echo ""
+echo "$TEXT"
