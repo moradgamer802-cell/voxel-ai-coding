@@ -97,9 +97,20 @@ zyvo share             # instant live Public HTTPS link (share with anyone on ph
 zyvo update            # delta update check (0 MB if core is unchanged)
 zyvo uninstall         # cleanly remove ZYVO (keeps your projects)
 oc-settings            # model tier menu
+zyvo-vision <file>     # AI describes any image (free, Gemini-powered)
 zyvo-browser <url>     # AI reads a web page and answers questions about it
 zyvo-browser search "query"  # real-time web search with AI summary
 ```
+
+### Vision (see images — free)
+```bash
+zyvo-vision photo.jpg                     # describe an image
+zyvo-vision photo.png "Read the error text"  # custom question
+```
+
+Powered by Google Gemini (`gemini-3.6-flash`) — free, ~60 requests/min, no
+rate limit issues. Built-in key — zero config; override with `GEMINI_API_KEY`
+or `~/.config/zyvo/vision.key`.
 
 ### Web Reader & Real-Time Search
 ```bash

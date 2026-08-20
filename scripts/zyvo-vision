@@ -1,0 +1,99 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# zyvo-vision — see images via Google Gemini (FREE, ~60 req/min — no Zen rate limits)
+# Usage:
+#   zyvo-vision <image> [question]
+# Supports: .jpg .jpeg .png .webp .gif
+# Model: gemini-3.6-flash (override: ZYVO_VISION_MODEL)
+# Key priority: GEMINI_API_KEY > ~/.config/zyvo/vision.key > built-in
+
+set -e
+
+FILE="$1"
+PROMPT="${2:-Describe this image in detail. Include all objects, colors, text, and layout.}"
+
+if [ -z "$FILE" ]; then
+    echo "Usage: zyvo-vision <image> [question]"
+    echo "Supports: jpg jpeg png webp gif"
+    exit 1
+fi
+if [ ! -f "$FILE" ]; then
+    echo "❌ File not found: $FILE"
+    exit 1
+fi
+
+if command -v python3 >/dev/null 2>&1; then
+    PY=python3
+elif command -v python >/dev/null 2>&1; then
+    PY=python
+else
+    echo "❌ Python is required for zyvo-vision" >&2
+    exit 1
+fi
+
+VISION_KEY_FILE="${HOME}/.config/zyvo/vision.key"
+KEY="${GEMINI_API_KEY:-}"
+if [ -z "$KEY" ] && [ -f "$VISION_KEY_FILE" ]; then
+    KEY="$(tr -d '[:space:]' < "$VISION_KEY_FILE" 2>/dev/null)"
+fi
+KEY="${KEY:-AQ.Ab8RN6LrbgbJVYZoyAsvvUjwtn0juAGMUVxiKtIChZIoIu1x9w}"
+MODEL="${ZYVO_VISION_MODEL:-gemini-3.6-flash}"
+
+exec "$PY" - "$FILE" "$PROMPT" "$KEY" "$MODEL" <<'PYVIS'
+import sys, os, base64, json, time
+import urllib.request, urllib.error
+
+def out(s):
+    try:
+        os.write(1, (str(s) + "\n").encode("utf-8", "replace"))
+    except Exception:
+        pass
+
+file_path = os.path.abspath(sys.argv[1])
+prompt = sys.argv[2]
+key = sys.argv[3]
+model = sys.argv[4]
+
+mime_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+            "webp": "image/webp", "gif": "image/gif"}
+ext = os.path.splitext(file_path)[1].lower().lstrip(".")
+mime = mime_map.get(ext, "image/jpeg")
+
+b64 = base64.b64encode(open(file_path, "rb").read()).decode()
+
+url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+payload = {"contents": [{"parts": [
+    {"text": prompt},
+    {"inline_data": {"mime_type": mime, "data": b64}}
+]}]}
+
+last = ""
+for attempt in range(3):
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(),
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            d = json.loads(r.read().decode())
+        out(f"📷 {os.path.basename(file_path)}:")
+        out("")
+        out(d["candidates"][0]["content"]["parts"][0]["text"])
+        sys.exit(0)
+    except urllib.error.HTTPError as e:
+        last = f"[Gemini error: HTTP {e.code}]"
+        try:
+            err = json.loads(e.read().decode())
+            msg = err.get("error", {}).get("message", "")
+            if msg:
+                last = f"[Gemini error: {msg[:150]}]"
+        except Exception:
+            pass
+        if e.code == 429:
+            time.sleep(10)
+        else:
+            break
+    except Exception as e:
+        last = f"[Gemini error: {str(e)[:120]}]"
+        break
+
+out(last)
+sys.exit(1)
+PYVIS

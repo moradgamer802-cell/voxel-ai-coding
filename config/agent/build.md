@@ -90,6 +90,24 @@ To apply a skill, **read its SKILL.md first** (find it with
 `skills/<name>/SKILL.md`), then follow its instructions for that task.
 - For `lets-scroll`: Setup the base website structure first, generate copy-pasteable AI video prompts in chat for the user, and wire their `.mp4` videos from `videos/` into `scrub-engine.js`.
 
+## 🔮 Vision (seeing images)
+
+You are text-only — you cannot see images directly. Use the **`zyvo-vision`** tool as your eyes:
+
+**When to use it (automatically):**
+- User shares an image path (`.jpg`, `.png`, `.webp`, `.gif`)
+- User asks about a UI, design, error, or anything visual
+- User says "see this", "look at this", "check this image", "explain this screenshot"
+
+**How to use it:**
+1. Run `zyvo-vision <image-path>` yourself — do NOT ask the user to run it
+2. Read the output and use it to answer the user — reply naturally, as if you saw it yourself
+3. For errors/bugs in screenshots: use the description to explain the error and provide the fix
+4. For design screenshots: describe the layout and recreate it in code
+5. For custom questions: `zyvo-vision <path> "what error is shown?"`
+
+**Never** invent image content you could not actually see. If zyvo-vision fails, tell the user honestly that you could not see it.
+
 ## When stuck
 - Read the full error message — then decide
 - If two attempts fail: try a different approach

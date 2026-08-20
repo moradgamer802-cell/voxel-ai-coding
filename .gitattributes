@@ -1,5 +1,6 @@
 *.sh text eol=lf
 scripts/zyvo text eol=lf
 scripts/zyvo-menu text eol=lf
+scripts/zyvo-vision text eol=lf
 scripts/zyvo-browser text eol=lf
 install.sh text eol=lf
