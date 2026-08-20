@@ -21,38 +21,52 @@ import sys
 
 # pixel-art wordmark rows (escaped JS strings from the home screen art)
 # -> design rows (decoded unicode). fit() re-encodes to exact length.
+# Each entry: (raw "OPENCODE" bytes, previously-shipped "ZYVO" design,
+# new big double-wide "ZYVO" design). Replacing both the raw form AND
+# the previous design lets a fresh binary get the big logo directly and
+# an already-branded binary (small ZYVO) upgrade in place.
 LOGO = [
-    # 8 glyphs "OPENCODE" -> 4 glyphs "ZYVO" (var O / var To, unused on home)
+    # 8 glyphs "OPENCODE" -> 8 glyphs of double-wide "ZYVO": every row
+    # fills the same width as the original wordmark (var O / var To)
     (b"\\u2588\\u2580\\u2580\\u2588 \\u2588\\u2580\\u2580\\u2588 \\u2588\\u2580\\u2580\\u2588 "
      b"\\u2588\\u2580\\u2580\\u2584 \\u2588\\u2580\\u2580\\u2580 \\u2588\\u2580\\u2580\\u2588 "
      b"\\u2588\\u2580\\u2580\\u2588 \\u2588\\u2580\\u2580\\u2588",
-     "█▀▀█ █  █ █  █ █▀▀█"),
+     "█▀▀█ █  █ █  █ █▀▀█",
+     "█▀▀▀▀▀▀▀ █      █ █      █ █▀▀▀▀▀▀█"),
     (b"\\u2588  \\u2588 \\u2588  \\u2588 \\u2588\\u2580\\u2580\\u2580 \\u2588  \\u2588 "
      b"\\u2588    \\u2588  \\u2588 \\u2588  \\u2588 \\u2588\\u2580\\u2580\\u2580",
-     "  ▄▀ █▀▀█  ▀▀  █  █"),
+     "  ▄▀ █▀▀█  ▀▀  █  █",
+     "    ▀▀▀▀ █▀▀▀▀▀▀█  ▀    ▀  █      █"),
     (b"\\u2580\\u2580\\u2580\\u2580 \\u2588\\u2580\\u2580\\u2580 \\u2580\\u2580\\u2580\\u2580 "
      b"\\u2580  \\u2580 \\u2580\\u2580\\u2580\\u2580 \\u2580\\u2580\\u2580\\u2580 "
      b"\\u2580\\u2580\\u2580\\u2580 \\u2580\\u2580\\u2580\\u2580",
-     "▀▀▀▀   █    ▀  ▀▀▀▀"),
+     "▀▀▀▀   █    ▀  ▀▀▀▀",
+     "▀▀▀▀▀▀▀▀    █       ▀▀▀▀▀▀ ▀▀▀▀▀▀▀▀"),
 ]
 
-# two-tone home-screen logo: left half (dim) "OPEN" -> "ZYV",
-# right half (bright) "CODE" -> "O"
+# two-tone home-screen logo: left half (dim) "OPEN" -> "ZY",
+# right half (bright) "CODE" -> "VO" (double-wide, fills the halves)
 LOGO_TN = [
-    # left rows -> Z Y V (row 1..3)
+    # left rows -> Z Y (row 1..3)
     (b"\\u2588\\u2580\\u2580\\u2588 \\u2588\\u2580\\u2580\\u2588 \\u2588\\u2580\\u2580\\u2588 \\u2588\\u2580\\u2580\\u2584",
-     "█▀▀█ █  █ █  █"),
+     "█▀▀█ █  █ █  █",
+     "█▀▀▀▀▀▀▀ █      █"),
     (b"\\u2588__\\u2588 \\u2588__\\u2588 \\u2588^^^ \\u2588__\\u2588",
-     "  ^▀ █^^█  ^▀ "),
+     "  ^▀ █^^█  ^▀ ",
+     "    ▀▀▀▀ █^    ^█"),
     (b"\\u2580\\u2580\\u2580\\u2580 \\u2588\\u2580\\u2580\\u2580 \\u2580\\u2580\\u2580\\u2580 \\u2580~~\\u2580",
-     "▀▀▀▀   █    ▀ "),
-    # right rows -> single accent O (row 1..3)
+     "▀▀▀▀   █    ▀ ",
+     "▀▀▀▀▀▀▀▀    █    "),
+    # right rows -> V O (row 1..3)
     (b"\\u2588\\u2580\\u2580\\u2580 \\u2588\\u2580\\u2580\\u2588 \\u2588\\u2580\\u2580\\u2588 \\u2588\\u2580\\u2580\\u2588",
-     "█▀▀█"),
+     "█▀▀█",
+     "█      █ █▀▀▀▀▀▀█"),
     (b"\\u2588___ \\u2588__\\u2588 \\u2588__\\u2588 \\u2588^^^",
-     "█  █"),
+     "█  █",
+     " ▀    ▀  █      █"),
     (b"\\u2580\\u2580\\u2580\\u2580 \\u2580\\u2580\\u2580\\u2580 \\u2580\\u2580\\u2580\\u2580 \\u2580\\u2580\\u2580\\u2580",
-     "▀▀▀▀"),
+     "▀▀▀▀",
+     "  ▀▀▀▀▀▀ ▀▀▀▀▀▀▀▀"),
 ]
 
 # (exact bytes to find, replacement "ZYVO" text) — replace ALL occurrences.
@@ -151,9 +165,10 @@ def main():
         # Erase the pixel-art logo: replace every art row (as currently
         # patched, or the raw unpatched form) with an all-space row of the
         # same decoded width and byte length. Layout stays intact.
-        for old, design in LOGO + LOGO_TN:
-            cur = fit(old, design)
-            for src, dst in ((cur, fit(cur, "")), (old, fit(old, ""))):
+        for old, prev, new in LOGO + LOGO_TN:
+            cur = fit(old, new)
+            prev = fit(old, prev)
+            for src, dst in ((cur, fit(cur, "")), (prev, fit(prev, "")), (old, fit(old, ""))):
                 if src not in buf:
                     continue
                 n = buf.count(src)
@@ -190,15 +205,17 @@ def main():
             f.write(buf)
         print(f"blanked {total} logo rows -> {sys.argv[2]}")
         return
-    for old, new in LOGO + LOGO_TN:
+    for old, prev, new in LOGO + LOGO_TN:
         new = fit(old, new)
-        if old not in buf:
-            print(f"SKIP {old[:52]!r}")
-            continue
-        n = buf.count(old)
-        buf = buf.replace(old, new)
-        total += n
-        print(f"OK x{n}  {old[:52]!r}")
+        prev = fit(old, prev)
+        for src, dst in ((old, new), (prev, new)):
+            if src not in buf:
+                print(f"SKIP {src[:52]!r}")
+                continue
+            n = buf.count(src)
+            buf = buf.replace(src, dst)
+            total += n
+            print(f"OK x{n}  {src[:52]!r}")
     for old, new in PATCHES:
         if len(new) < len(old):
             new = new + b" " * (len(old) - len(new))
