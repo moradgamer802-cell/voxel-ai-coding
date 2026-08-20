@@ -19,48 +19,43 @@ allowed-tools: Bash, Read, Write, Edit, AskUserQuestion, Skill
 
 # lets-scroll
 
-Produces a landing page where **scroll drives a camera**: it dives from outside a scene
-into its interior, then flies out and into the next scene, continuously, with no visible
-cuts. The visuals are AI-generated — stills via Higgsfield (or Codex), the video chain
-via **Monid by default** (pay-per-clip Seedance 2.0; Higgsfield credits as fallback) —
-and the page just scrubs pre-rendered video by scroll position. A **manual asset path**
-(Step 1.7) swaps the render calls for a prompt + file handoff: the user generates every
-still and clip in tools of their choice and drops the files into the work folder;
-everything downstream (frame extraction, encode, engine, QA) is identical. This is the same technique behind Apple's scroll-through product
-pages — the camera genuinely moves, scroll only drives time.
+Produces an Apple-style **3D scroll-driven landing page**: as the visitor scrolls, a pre-rendered camera dives smoothly through 3D dioramas or cinematic scenes with zero cuts — one continuous connected flight.
 
-**What you generate:** N scene stills → N "dive-in" camera clips → N-1 "connector" clips
-that join consecutive scenes seamlessly → a portable scrub engine that plays the whole
-chain as one flight.
-
-**The one rule that makes or breaks it:** seams must be *frame-identical*. Read
-[The seamless chain](#step-5--the-seamless-chain-the-critical-part) before generating any
-connector. Getting this wrong is the single most common failure and produces a visible
-"pop" between scenes.
-
-Do not assume a frontend framework. The scrub engine in `references/scrub-engine.js` is
-self-contained vanilla JS (it builds its own DOM + injects its own CSS into a container
-you give it), so it drops into plain HTML, Next.js, Vue, a Python-served page, anything.
-The value of this skill is the Higgsfield pipeline, the prompts, and the seam method —
-not the framework.
+The scrub engine (`references/scrub-engine.js`) is lightweight vanilla JS with zero dependencies, featuring smooth rAF scrub smoothing, seek coalescing, and mobile optimizations.
 
 ---
 
-## ⚡ Fast Mode: Local Video Folder Drop (Zero-Config — Recommended on Mobile/Termux)
+## 🎯 Primary Workflow: Prompt Handover & Video Drop (Default — Zero-Config)
 
-When the user already has video clips (generated from any web AI tool like Kling AI, Luma Dream Machine, Runway, Minimax Hailuo, Pika, or saved in phone folders e.g. `videos/`, `assets/`, `Download/`):
+This is the default, 100% mobile-friendly workflow:
 
-1. **Scan Videos:** Find all video files (`.mp4`, `.webm`, `.mov`) in the specified folder, ordered by name/time.
-2. **Extract Posters (if ffmpeg exists):**
-   ```bash
-   ffmpeg -ss 0 -i video1.mp4 -frames:v 1 -q:v 2 video1_poster.webp
-   ```
-3. **Build HTML & Engine:**
-   - Create `index.html`, `style.css`, and copy `references/scrub-engine.js`.
-   - Wire the videos into `sections` with matching section titles, captions, tags, and accent colors.
-4. **Auto Launch:**
-   - Execute `zyvo preview .` (starts background server, auto-opens in phone browser, and generates temporary public live link).
-   - Instant 3D scroll world ready in seconds without any cloud CLI/API keys!
+### Step 1: Concept & Website Base Setup
+1. Ask the user for the **Topic / Business**, **Brand Name**, and **Number of Scenes** (2, 3, 4, or 6 scenes).
+2. Immediately generate the complete frontend website:
+   - `index.html` + `style.css` + copy `references/scrub-engine.js`.
+   - Setup the section titles, subtitles, tags, accent colors, and CTA buttons.
+   - Create a `videos/` folder in the project.
+
+### Step 2: Deliver AI Video Prompts in Chat
+Generate 2–4 tailored, ultra-cinematic prompts formatted for web AI video tools (**Kling AI, Luma Dream Machine, Runway Gen-3, Minimax Hailuo, Pika**) and present them directly in the chat for the user to copy:
+- **Scene 1 Prompt:** Establish the world & opening camera glide.
+- **Scene 2 Prompt:** Interior / process camera dive.
+- **Scene 3/Finale Prompt:** Hero product / destination close-up.
+
+Tell the user:
+> *"I've set up the website layout! Copy these prompts into your preferred AI video generator (Kling / Luma / Runway), save the resulting `.mp4` clips into the `videos/` folder (e.g. `video1.mp4`, `video2.mp4`), and reply 'done'."*
+
+### Step 3: Video Assembly & Live Preview
+When the user places the videos in `videos/` (or already has videos):
+1. Scan `videos/` (or specified folder) for `.mp4` clips in sequence.
+2. Auto-extract poster frames (`ffmpeg -ss 0 -i video1.mp4 -frames:v 1 -q:v 2 video1_poster.webp` if ffmpeg exists).
+3. Connect the clips into `mountLetsScroll()` in `index.html`.
+4. Run `zyvo preview .` to start the background server, auto-open the device browser, and deliver the Local + Temporary Public Live Link!
+
+---
+
+## ⚙️ Alternate Workflow: Direct Cloud CLI Render (Monid / Higgsfield)
+*(For desktop environments with configured CLI API keys)*
 
 ---
 

@@ -88,6 +88,7 @@ apply the matching skill(s)** — no user prompt needed:
 To apply a skill, **read its SKILL.md first** (find it with
 `find ~/.config/opencode/skills -name SKILL.md`, or in the repo
 `skills/<name>/SKILL.md`), then follow its instructions for that task.
+- For `lets-scroll`: Setup the base website structure first, generate copy-pasteable AI video prompts in chat for the user, and wire their `.mp4` videos from `videos/` into `scrub-engine.js`.
 
 ## When stuck
 - Read the full error message — then decide
