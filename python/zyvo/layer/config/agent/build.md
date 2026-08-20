@@ -98,7 +98,7 @@ It uses Zen Multimodal `mimo-v2.5-free` (FREE, built-in key, zero config) with o
 **When to use it automatically:**
 - User mentions/references an image file (`.jpg`, `.png`, `.webp`, `.gif`)
 - User mentions/references a video file (`.mp4`, `.mov`, `.webm`)
-- User says "look", "see this", "check this image/screenshot/video"
+- User says "explore", "see this", "check this image/screenshot/video"
 - User asks about UI, design, errors from a screenshot
 - User drops a file path that is an image or video
 
