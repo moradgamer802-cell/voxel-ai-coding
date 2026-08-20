@@ -49,14 +49,16 @@ BIN="$(find_zyvo || true)"
 menu() {
     printf '\033[1;96m=== ZYVO launcher ===\033[0m\n'
     printf '  1) Chat (new session)\n'
-    printf '  2) Keys help\n'
-    printf '  3) Version\n'
-    printf '  4) Update ZYVO\n'
-    printf '  5) Headless server (serve)\n'
-    printf '  6) Plugins\n'
-    printf '  7) Trust a folder\n'
-    printf '  8) Exit\n'
-    printf 'Choose [1-8]: '
+    printf '  2) Open project       zyvo <name>\n'
+    printf '  3) List projects       zyvo ls\n'
+    printf '  4) Keys help\n'
+    printf '  5) Version\n'
+    printf '  6) Update ZYVO\n'
+    printf '  7) Headless server (serve)\n'
+    printf '  8) Plugins\n'
+    printf '  9) Trust a folder\n'
+    printf '  0) Exit\n'
+    printf 'Choose [0-9]: '
 }
 
 while :; do
@@ -68,32 +70,64 @@ while :; do
             launch "$BIN"
             ;;
         2)
-            printf '\nInside the ZYVO TUI:\n  Ctrl+K  -> command palette (/model, /theme...)\n  Esc    -> back\n  /dekho /fix /review /model /yolo /zyvo /open -> in-chat commands\nPress any key to return to menu...\n'
-            read -r _
+            printf 'Project name: '
+            read -r pname
+            [ -n "$BIN" ] || { echo "zyvo not found" >&2; exit 1; }
+            launch "$BIN" "$pname"
             ;;
         3)
-            if [ -n "$BIN" ]; then launch "$BIN" --version; else echo "zyvo not installed"; fi
+            [ -n "$BIN" ] || { echo "zyvo not found" >&2; exit 1; }
+            SDIR_ROOT=""
+            if [ -d /storage/emulated/0 ]; then SDIR_ROOT=/storage/emulated/0/zyvo
+            elif [ -d /sdcard ]; then SDIR_ROOT=/sdcard/zyvo
+            else SDIR_ROOT="$HOME/zyvo"
+            fi
+            echo ""
+            echo "📁 ZYVO Projects ($SDIR_ROOT):"
+            if [ -d "$SDIR_ROOT" ]; then
+                count=0
+                for d in "$SDIR_ROOT"/*; do
+                    if [ -d "$d" ]; then
+                        b="$(basename "$d")"
+                        [ "$b" != ".opencode" ] && echo "  🔹 $b" && count=$((count+1))
+                    fi
+                done
+                [ $count -eq 0 ] && echo "  (no project folders yet)"
+            else
+                echo "  (no zyvo folder yet)"
+            fi
+            echo ""
+            echo "Open or create: zyvo <project-name>"
+            echo ""
             read -r _ || true
             ;;
         4)
+            printf '\nInside the ZYVO TUI:\n  Ctrl+K  -> command palette (/model, /theme...)\n  Esc    -> back\n  /dekho /fix /review /model /yolo /zyvo /open -> in-chat commands\nPress any key to return to menu...\n'
+            read -r _
+            ;;
+        5)
+            if [ -n "$BIN" ]; then launch "$BIN" --version; else echo "zyvo not installed"; fi
+            read -r _ || true
+            ;;
+        6)
             echo "Run: sh $PREFIX/../share/zyvo/install.sh   (or re-download the installer)"
             read -r _ || true
             ;;
-        5)
+        7)
             [ -n "$BIN" ] || { echo "zyvo not found" >&2; exit 1; }
             launch "$BIN" serve 2>/dev/null || launch "$BIN" serve --port 4020
             ;;
-        6)
+        8)
             [ -n "$BIN" ] || { echo "zyvo not found" >&2; exit 1; }
             launch "$BIN" plugin
             ;;
-        7)
+        9)
             printf 'Folder to trust: '
             read -r folder
             [ -n "$BIN" ] || { echo "zyvo not found" >&2; exit 1; }
             launch "$BIN" trust include "$folder"
             ;;
-        8) exit 0 ;;
+        0) exit 0 ;;
         *) ;;
     esac
 done

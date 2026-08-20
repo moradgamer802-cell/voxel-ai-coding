@@ -195,67 +195,105 @@ sys.exit(0)
 PYPREV
 fi
 
-# ---- args: named session (legacy permission flags silently ignored) ----
-SESSION_MODE=0
-SESSION_NAME=""
-while [ "$#" -gt 0 ]; do
-    case "$1" in
-        --yolo|-y|--safe|--ask) shift; continue;;
-        session|sessions)
-            SESSION_MODE=1; shift
-            [ "$#" -gt 0 ] && { SESSION_NAME="$1"; shift; }
-            break;;
-        *) break;;
-    esac
-done
+# ---- workspace and session resolver ----
+# Structure:
+#   /storage/emulated/0/zyvo/
+#   ├── <project1>/    (zyvo <project1> or zyvo session <project1>)
+#   ├── <project2>/    (zyvo <project2>)
+#   └── default/       (zyvo)
+#
+# Every project works strictly inside its own dedicated subfolder
+# so files from different projects never mix or conflict!
 
-# ---- workspace resolve ----
-# The default workspace and named sessions live on top of the shared
-# storage base (falling back to home). The storage root holds thousands of
-# files (DCIM, WhatsApp, Android/) — working there again makes the phone
-# lag and heat up. A fresh dedicated folder = light + fast.
 WS_BASE=""
 if [ -d /storage/emulated/0 ]; then WS_BASE=/storage/emulated/0
 elif [ -d /sdcard ]; then WS_BASE=/sdcard
 fi
-if [ "$SESSION_MODE" = 1 ]; then
-    # Named session = its own folder inside the zyvo/ folder:
-    #   /storage/emulated/0/zyvo/<name>/
-    SDIR_ROOT="${WS_BASE:-$HOME}/zyvo"
-    if [ -z "$SESSION_NAME" ]; then
-        echo "ZYVO sessions ($SDIR_ROOT):"
-        if [ -d "$SDIR_ROOT" ]; then
-            ls -1t "$SDIR_ROOT" 2>/dev/null | while read -r d; do
-                [ -n "$d" ] && [ -d "$SDIR_ROOT/$d" ] && printf '  %s\n' "$d"
-            done
-        fi
-        echo "Open/new: zyvo session <name>"
-        exit 0
-    fi
+SDIR_ROOT="${WS_BASE:-$HOME}/zyvo"
+mkdir -p "$SDIR_ROOT" 2>/dev/null || true
+
+SESSION_MODE=0
+SESSION_NAME=""
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --yolo|-y|--safe|--ask) shift; continue ;;
+        session|sessions|ls|list)
+            shift
+            if [ "$#" -gt 0 ] && [ "$1" != "ls" ] && [ "$1" != "list" ]; then
+                SESSION_NAME="$1"; shift; SESSION_MODE=1
+            else
+                echo ""
+                echo "📁 ZYVO Projects ($SDIR_ROOT):"
+                if [ -d "$SDIR_ROOT" ]; then
+                    count=0
+                    for d in "$SDIR_ROOT"/*; do
+                        if [ -d "$d" ]; then
+                            b="$(basename "$d")"
+                            [ "$b" != ".opencode" ] && echo "  🔹 $b" && count=$((count+1))
+                        fi
+                    done
+                    [ $count -eq 0 ] && echo "  (no project folders yet)"
+                fi
+                echo ""
+                echo "Open or create: zyvo <project-name>"
+                echo "Example:        zyvo coffee-shop"
+                echo ""
+                exit 0
+            fi
+            break ;;
+        -*)
+            # Flag for opencode binary, stop parsing
+            break ;;
+        *)
+            if [ -d "$1" ]; then
+                # User passed an existing path (e.g. zyvo /path/to/folder)
+                cd "$1"
+                export OPENCODE_DEFAULT_DIR="$PWD"
+                shift
+                break
+            else
+                # User passed a project name directly (e.g. zyvo coffee-shop)
+                SESSION_NAME="$1"; shift; SESSION_MODE=1
+                break
+            fi
+            ;;
+    esac
+done
+
+if [ -z "$SESSION_NAME" ]; then
+    case "$PWD" in
+        "$SDIR_ROOT"/*)
+            # Already inside a project subfolder
+            export OPENCODE_DEFAULT_DIR="$PWD"
+            ;;
+        *)
+            if [ "$PWD" = "$HOME" ] || [ "$PWD" = "$SDIR_ROOT" ]; then
+                # Default dedicated folder so root is never cluttered
+                SDIR="$SDIR_ROOT/default"
+                mkdir -p "$SDIR" 2>/dev/null || true
+                cd "$SDIR"
+                export OPENCODE_DEFAULT_DIR="$SDIR"
+            else
+                export OPENCODE_DEFAULT_DIR="$PWD"
+            fi
+            ;;
+    esac
+else
     case "$SESSION_NAME" in
         ""|"."|".."|*[!A-Za-z0-9._-]*)
-            echo "zyvo: session names may only contain a-z 0-9 . _ - (no spaces/symbols)" >&2
-            exit 1;;
+            echo "zyvo: project names may only contain a-z 0-9 . _ - (no spaces/symbols)" >&2
+            exit 1 ;;
     esac
     SDIR="$SDIR_ROOT/$SESSION_NAME"
-    if mkdir -p "$SDIR" 2>/dev/null && [ -d "$SDIR" ]; then
+    mkdir -p "$SDIR" 2>/dev/null || true
+    if [ -d "$SDIR" ]; then
         cd "$SDIR"
         export OPENCODE_DEFAULT_DIR="$SDIR"
+        SESSION_MODE=1
     else
-        echo "zyvo: could not create session folder ($SDIR)" >&2
+        echo "zyvo: could not create project folder ($SDIR)" >&2
         exit 1
-    fi
-elif [ "$#" -eq 0 ] && [ "$PWD" = "$HOME" ]; then
-    # Default workspace: dedicated folder (not the storage root), only
-    # when launching from home without a directory argument.
-    if [ -n "$WS_BASE" ]; then
-        if mkdir -p "$WS_BASE/zyvo" 2>/dev/null && [ -d "$WS_BASE/zyvo" ]; then
-            cd "$WS_BASE/zyvo"
-            export OPENCODE_DEFAULT_DIR="$WS_BASE/zyvo"
-        else
-            cd "$WS_BASE"
-            export OPENCODE_DEFAULT_DIR="$WS_BASE"
-        fi
     fi
 fi
 
