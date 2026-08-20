@@ -608,22 +608,22 @@ install_script() { # $1 src $2 dest — shebang rewritten for non-Termux
     fi
 }
 
-blank_logo() { # erase the home-screen ASCII art from the core binary
-    # patch-brand.py --blank-logo replaces the pixel-art logo rows with
-    # same-length spaces (byte layout stays intact — no crash), so the
-    # screen stays clean on every install/update. Runs after the layer is
-    # on disk (the script ships in the layer). Idempotent — safe on
-    # already-blanked or differently-branded binaries (rows are skipped).
+brand_logo() { # put the ZYVO brand logo into the core binary
+    # patch-brand.py replaces the "OPENCODE" pixel-art wordmark with the
+    # "ZYVO" design, same byte length (layout stays intact — no crash),
+    # on every install/update. Runs after the layer is on disk (the
+    # script ships in the layer). Idempotent — safe on already-branded
+    # binaries (missing rows are skipped).
     [ -f "$LIB_DIR/patch-brand.py" ] || return 0
     [ -f "$STAMP_DIR/opencode.bin" ] || return 0
     sys_has_python || return 0
     local py
     if cmd_exists python3; then py=python3; else py=python; fi
-    status "blanking brand logo"
-    if ! run "$py" "$LIB_DIR/patch-brand.py" "$STAMP_DIR/opencode.bin" "$STAMP_DIR/opencode.bin" --blank-logo; then
-        log "blank_logo: failed (ignored — binary untouched)"
+    status "branding logo (ZYVO)"
+    if ! run "$py" "$LIB_DIR/patch-brand.py" "$STAMP_DIR/opencode.bin" "$STAMP_DIR/opencode.bin"; then
+        log "brand_logo: failed (ignored — binary untouched)"
     fi
-    status "brand logo blanked"
+    status "brand logo applied"
 }
 
 merge_json() { # $1 user config $2 repo config — merge with force-keys
@@ -698,7 +698,7 @@ setup_env
 setup_deps
 setup_core
 setup_layer
-blank_logo
+brand_logo
 verify_install
 
 # ---- done ----
