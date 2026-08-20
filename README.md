@@ -83,7 +83,6 @@ files, and does web work on its own (beginner-friendly design).
 | Command | **`zyvo`** — opens `default/` project. `zyvo coffee-shop` → opens/creates `zyvo/coffee-shop/` project folder |
 | AI Provider | **OpenCode Zen — zero config** (key already built in, nothing to set up) |
 | Model | **DeepSeek full-power** (deepseek-v4-flash-free) by default — stable; lightning/mid tiers also available |
-| Vision Eyes | **Zen Multimodal (`mimo-v2.5-free`)** — AI can automatically see images, screenshots & video frames! |
 | Language | Speaks **Banglish** (custom full-power agent) |
 | Commands | `/explore`, `/review`, `/fix`, `/yolo`, `/zyvo`, `/open` + 20 skills |
 
@@ -98,21 +97,9 @@ zyvo share             # instant live Public HTTPS link (share with anyone on ph
 zyvo update            # delta update check (0 MB if core is unchanged)
 zyvo uninstall         # cleanly remove ZYVO (keeps your projects)
 oc-settings            # model tier menu
-zyvo-vision <file>     # AI describes any image or video (free, zero config)
 zyvo-browser <url>     # AI reads a web page and answers questions about it
 zyvo-browser search "query"  # real-time web search with AI summary
 ```
-
-### Vision Eyes (see images & videos — free)
-```bash
-zyvo-vision photo.jpg                     # describe an image
-zyvo-vision video.mp4                     # analyze 3 frames (start / middle / end)
-zyvo-vision photo.png "Read the error text"  # custom question
-```
-
-Powered by Zen Multimodal (`mimo-v2.5-free`). Built-in free key — zero
-config; override with `OPENCODE_API_KEY`. Rate limits are handled
-automatically (12s wait + retry). Videos use ffmpeg to grab 3 frames.
 
 ### Web Reader & Real-Time Search
 ```bash
