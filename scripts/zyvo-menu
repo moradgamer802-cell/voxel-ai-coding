@@ -5,7 +5,7 @@
 # (which sets LD_PRELOAD=libtagfix.so + all env). If zyvo is not on PATH,
 # paper over it with a direct opencode.bin launch using the same env chain.
 #
-# Note: /model, /theme and /auto are TUI-internal commands — they can't be
+# Note: /models, /theme and /auto are TUI-internal commands — they can't be
 # run from a shell. The menu prints the exact keys to press inside the TUI.
 
 set -e

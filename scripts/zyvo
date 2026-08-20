@@ -384,6 +384,17 @@ def clean_md(p):
 for root in roots:
     if not os.path.isdir(root):
         continue
+    # stale /model command files are removed — the built-in /models picker
+    # is the only model command that should exist
+    cdir = os.path.join(root, "command")
+    if os.path.isdir(cdir):
+        for fn in ("model.md", "model.json", "model.jsonc"):
+            p = os.path.join(cdir, fn)
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames
                        if d not in ("node_modules", ".git", "skills", "themes")]
