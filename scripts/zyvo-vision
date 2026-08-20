@@ -1,28 +1,9 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # zyvo-vision — Vision bridge for ZYVO CLI
-# Uses Google Gemini Flash (FREE) to describe images/videos
-# Usage: zyvo-vision <file> [prompt]
+# Uses OpenCode Zen (mimo-v2.5-free) / Gemini Flash to describe images and videos
 # Supports: .jpg .png .webp .gif .mp4 .mov .webm
 
 set -e
-
-VISION_KEY_FILE="${HOME}/.config/zyvo/vision.key"
-_ZYVO_B64_KEY="QVEuQWI4Uk42THJiZ2JKVllab3lBc3Z2VWp3dG4wanVBR01VVnhpS3RJQ2haSW9JdTF4OXc="
-VISION_KEY="${GEMINI_API_KEY:-}"
-
-# Load key: env > saved file > built-in default
-if [ -z "$VISION_KEY" ] && [ -f "$VISION_KEY_FILE" ]; then
-    VISION_KEY="$(cat "$VISION_KEY_FILE" | tr -d '[:space:]')"
-fi
-if [ -z "$VISION_KEY" ]; then
-    VISION_KEY="$(printf '%s' "$_ZYVO_B64_KEY" | base64 -d 2>/dev/null || printf '%s' "$_ZYVO_B64_KEY" | base64 -D 2>/dev/null || true)"
-fi
-
-if [ -z "$VISION_KEY" ]; then
-    echo "❌ Vision not configured. Run: zyvo setup-vision"
-    echo "   Get your FREE key: https://aistudio.google.com/apikey"
-    exit 1
-fi
 
 FILE="$1"
 PROMPT="${2:-Describe this image in detail. Include all text, UI elements, errors, colors, layout, and any notable details.}"
@@ -38,125 +19,156 @@ if [ ! -f "$FILE" ]; then
     exit 1
 fi
 
-# Detect mime type
-EXT="${FILE##*.}"
-EXT="$(echo "$EXT" | tr '[:upper:]' '[:lower:]')"
-IS_VIDEO=0
-
-case "$EXT" in
-    jpg|jpeg) MIME="image/jpeg" ;;
-    png)      MIME="image/png" ;;
-    webp)     MIME="image/webp" ;;
-    gif)      MIME="image/gif" ;;
-    mp4)      MIME="video/mp4"; IS_VIDEO=1 ;;
-    mov)      MIME="video/quicktime"; IS_VIDEO=1 ;;
-    webm)     MIME="video/webm"; IS_VIDEO=1 ;;
-    *)        echo "❌ Unsupported format: .$EXT"; exit 1 ;;
-esac
-
-TMPDIR="${TMPDIR:-/tmp}"
-
-# For videos: extract 3 key frames and analyze those
-if [ "$IS_VIDEO" = 1 ]; then
-    if command -v ffmpeg >/dev/null 2>&1; then
-        FRAMES_DIR="$TMPDIR/zyvo-vision-frames-$$"
-        mkdir -p "$FRAMES_DIR"
-
-        # Get video duration
-        DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$FILE" 2>/dev/null || echo "6")
-        DURATION="${DURATION%.*}"
-        [ -z "$DURATION" ] || [ "$DURATION" -le 0 ] 2>/dev/null && DURATION=6
-
-        # Extract 3 frames: start, middle, near-end
-        T1=0
-        T2=$((DURATION / 2))
-        T3=$((DURATION - 1))
-        [ "$T3" -le 0 ] && T3=0
-
-        ffmpeg -ss "$T1" -i "$FILE" -frames:v 1 -q:v 2 "$FRAMES_DIR/frame1.jpg" -y 2>/dev/null
-        ffmpeg -ss "$T2" -i "$FILE" -frames:v 1 -q:v 2 "$FRAMES_DIR/frame2.jpg" -y 2>/dev/null
-        ffmpeg -ss "$T3" -i "$FILE" -frames:v 1 -q:v 2 "$FRAMES_DIR/frame3.jpg" -y 2>/dev/null
-
-        # Combine frame descriptions
-        RESULT=""
-        for i in 1 2 3; do
-            FPATH="$FRAMES_DIR/frame${i}.jpg"
-            [ -f "$FPATH" ] || continue
-            B64=$(base64 -w 0 "$FPATH" 2>/dev/null || base64 "$FPATH" 2>/dev/null)
-            FPROMPT="This is frame $i of 3 from a video. $PROMPT"
-
-            RESP=$(curl -s -X POST \
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$VISION_KEY" \
-                -H "Content-Type: application/json" \
-                -d "{
-                    \"contents\": [{
-                        \"parts\": [
-                            {\"text\": \"$FPROMPT\"},
-                            {\"inline_data\": {\"mime_type\": \"image/jpeg\", \"data\": \"$B64\"}}
-                        ]
-                    }]
-                }" 2>/dev/null)
-
-            TEXT=$(echo "$RESP" | python3 -c "
-import sys, json
-try:
-    d = json.load(sys.stdin)
-    print(d['candidates'][0]['content']['parts'][0]['text'])
-except:
-    print('[Frame $i: could not analyze]')
-" 2>/dev/null)
-            RESULT="${RESULT}--- Frame $i (${T1}s / ${T2}s / ${T3}s) ---
-${TEXT}
-
-"
-            case "$i" in
-                1) T_LABEL="start" ;;
-                2) T_LABEL="middle" ;;
-                3) T_LABEL="end" ;;
-            esac
-        done
-
-        rm -rf "$FRAMES_DIR"
-        echo "🎬 Video Analysis ($FILE, ${DURATION}s):"
-        echo ""
-        echo "$RESULT"
-        exit 0
-    else
-        echo "❌ ffmpeg required for video analysis. Install: pkg install ffmpeg"
-        exit 1
-    fi
+# Locate python3
+if command -v python3 >/dev/null 2>&1; then
+    PY=python3
+elif command -v python >/dev/null 2>&1; then
+    PY=python
+else
+    echo "❌ Python is required for vision analysis" >&2
+    exit 1
 fi
 
-# For images: direct API call
-B64=$(base64 -w 0 "$FILE" 2>/dev/null || base64 "$FILE" 2>/dev/null)
+ZEN_KEY="${OPENCODE_API_KEY:-sk-PKOWRt2391BL0MP3W90yaG8qx4vofQJQgigJreBBYjrArj0lwuU1HkWUqOHgDGHP}"
+VISION_KEY_FILE="${HOME}/.config/zyvo/vision.key"
+GEMINI_KEY="${GEMINI_API_KEY:-}"
+[ -z "$GEMINI_KEY" ] && [ -f "$VISION_KEY_FILE" ] && GEMINI_KEY="$(cat "$VISION_KEY_FILE" | tr -d '[:space:]')"
 
-RESP=$(curl -s -X POST \
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$VISION_KEY" \
-    -H "Content-Type: application/json" \
-    -d "{
-        \"contents\": [{
-            \"parts\": [
-                {\"text\": \"$PROMPT\"},
-                {\"inline_data\": {\"mime_type\": \"$MIME\", \"data\": \"$B64\"}}
+exec "$PY" - "$FILE" "$PROMPT" "$ZEN_KEY" "$GEMINI_KEY" <<'PYVIS'
+import sys, os, base64, json, subprocess, urllib.request, urllib.error
+
+file_path = os.path.abspath(sys.argv[1])
+prompt = sys.argv[2]
+zen_key = sys.argv[3]
+gemini_key = sys.argv[4] if len(sys.argv) > 4 else ""
+
+ext = os.path.splitext(file_path)[1].lower().lstrip(".")
+mime_map = {
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "webp": "image/webp",
+    "gif": "image/gif",
+    "mp4": "video/mp4",
+    "mov": "video/quicktime",
+    "webm": "video/webm"
+}
+mime = mime_map.get(ext, "image/jpeg")
+is_video = ext in ("mp4", "mov", "webm")
+
+def analyze_zen_mimo(b64_data, mime_type, custom_prompt):
+    url = "https://opencode.ai/zen/v1/chat/completions"
+    data_url = f"data:{mime_type};base64,{b64_data}"
+    payload = {
+        "model": "mimo-v2.5-free",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": custom_prompt},
+                    {"type": "image_url", "image_url": {"url": data_url}}
+                ]
+            }
+        ],
+        "max_tokens": 1500
+    }
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {zen_key}"
+        }
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=45) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return data["choices"][0]["message"]["content"]
+    except urllib.error.HTTPError as e:
+        err_msg = e.read().decode("utf-8", errors="ignore")
+        raise RuntimeError(f"Zen API error ({e.code}): {err_msg}")
+    except Exception as e:
+        raise RuntimeError(f"Zen request failed: {e}")
+
+def analyze_gemini(b64_data, mime_type, custom_prompt, key):
+    if not key:
+        return None
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}"
+    payload = {
+        "contents": [{
+            "parts": [
+                {"text": custom_prompt},
+                {"inline_data": {"mime_type": mime_type, "data": b64_data}}
             ]
         }]
-    }" 2>/dev/null)
-
-TEXT=$(echo "$RESP" | python3 -c "
-import sys, json
-try:
-    d = json.load(sys.stdin)
-    print(d['candidates'][0]['content']['parts'][0]['text'])
-except Exception as e:
-    # Try to get error message
+    }
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"}
+    )
     try:
-        d = json.load(open('/dev/stdin')) if False else json.loads(sys.stdin.read()) if False else d
-        err = d.get('error', {}).get('message', str(e))
-        print(f'❌ API Error: {err}')
-    except:
-        print(f'❌ Could not parse response: {e}')
-" 2>/dev/null)
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception:
+        return None
 
-echo "📷 Image Analysis ($FILE):"
-echo ""
-echo "$TEXT"
+def analyze_frame(img_path, frame_prompt):
+    with open(img_path, "rb") as fh:
+        b64 = base64.b64encode(fh.read()).decode("utf-8")
+    
+    # Try Zen mimo-v2.5-free first
+    try:
+        res = analyze_zen_mimo(b64, "image/jpeg" if is_video else mime, frame_prompt)
+        if res:
+            return res
+    except Exception as zen_err:
+        # Fallback to Gemini if configured
+        if gemini_key:
+            res = analyze_gemini(b64, "image/jpeg" if is_video else mime, frame_prompt, gemini_key)
+            if res:
+                return res
+        return f"[Analysis error: {zen_err}]"
+
+if is_video:
+    import tempfile, shutil
+    tmp_dir = tempfile.mkdtemp(prefix="zyvo-vid-")
+    try:
+        dur_cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", file_path]
+        try:
+            dur_str = subprocess.check_output(dur_cmd, stderr=subprocess.DEVNULL).decode().strip()
+            duration = max(1, int(float(dur_str)))
+        except Exception:
+            duration = 6
+
+        t_points = [0, duration // 2, max(0, duration - 1)]
+        frames = []
+        for i, t in enumerate(t_points):
+            out_img = os.path.join(tmp_dir, f"frame_{i+1}.jpg")
+            ff_cmd = ["ffmpeg", "-ss", str(t), "-i", file_path, "-frames:v", "1", "-q:v", "2", out_img, "-y"]
+            subprocess.run(ff_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if os.path.exists(out_img):
+                frames.append((i+1, t, out_img))
+
+        if not frames:
+            print("❌ ffmpeg could not extract frames from video.")
+            sys.exit(1)
+
+        print(f"🎬 Video Analysis ({os.path.basename(file_path)}, {duration}s):\n")
+        labels = ["Opening / Start", "Middle Scene", "Ending / Payoff"]
+        for i, t, fpath in frames:
+            lbl = labels[i-1] if i <= len(labels) else f"Frame {i}"
+            fprompt = f"This is frame {i} of 3 ({lbl}, at {t}s) from video {os.path.basename(file_path)}. {prompt}"
+            desc = analyze_frame(fpath, fprompt)
+            print(f"--- Frame {i} [{lbl} at {t}s] ---")
+            print(desc)
+            print()
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+else:
+    print(f"📷 Image Analysis ({os.path.basename(file_path)}):\n")
+    desc = analyze_frame(file_path, prompt)
+    print(desc)
+
+PYVIS

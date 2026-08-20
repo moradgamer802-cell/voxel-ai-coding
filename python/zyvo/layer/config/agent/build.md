@@ -93,7 +93,7 @@ To apply a skill, **read its SKILL.md first** (find it with
 ## 🔮 Vision (seeing images & videos)
 
 You have a **vision tool** — `zyvo-vision` — that lets you see images and videos.
-It uses Google Gemini Flash (FREE, built-in key, zero config).
+It uses Zen Multimodal `mimo-v2.5-free` (FREE, built-in key, zero config) with optional Gemini fallback.
 
 **When to use it automatically:**
 - User mentions/references an image file (`.jpg`, `.png`, `.webp`, `.gif`)

@@ -83,7 +83,7 @@ files, and does web work on its own (beginner-friendly design).
 | Command | **`zyvo`** — opens `default/` project. `zyvo coffee-shop` → opens/creates `zyvo/coffee-shop/` project folder |
 | AI Provider | **OpenCode Zen — zero config** (key already built in, nothing to set up) |
 | Model | **DeepSeek full-power** (deepseek-v4-flash-free) by default — stable; lightning/mid tiers also available |
-| Vision Eyes | **Built-in Gemini Flash Bridge** — AI can automatically see images, screenshots & video frames! |
+| Vision Eyes | **Zen Multimodal (`mimo-v2.5-free`)** — AI can automatically see images, screenshots & video frames! |
 | Language | Speaks **Banglish** (custom full-power agent) |
 | Commands | `/explore`, `/review`, `/fix`, `/yolo`, `/zyvo`, `/open` + 20 skills |
 
