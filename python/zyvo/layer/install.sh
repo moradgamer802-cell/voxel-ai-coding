@@ -42,21 +42,27 @@ elif [ "$(uname -o 2>/dev/null)" = "Android" ]; then
     # Android shell outside Termux (adb, other terminal apps)
     ENV_KIND="android"
 else
-    case "$(uname -s)" in
-        Linux)  ENV_KIND="linux" ;;
-        Darwin) ENV_KIND="macos" ;;
-        *)      ENV_KIND="unknown" ;;
+    case "$(uname -s 2>/dev/null)" in
+        Linux)                      ENV_KIND="linux" ;;
+        Darwin)                     ENV_KIND="macos" ;;
+        FreeBSD|OpenBSD|NetBSD|DragonFly) ENV_KIND="bsd" ;;
+        SunOS|AIX)                  ENV_KIND="unix" ;;
+        MINGW*|MSYS*|CYGWIN*|Windows_NT) ENV_KIND="windows" ;;
+        *)                          ENV_KIND="posix" ;;   # never a dead end
     esac
 fi
+# iSH / Alpine on iOS, chromeOS crostini, WSL — all behave like linux
+[ -n "$WSL_DISTRO_NAME" ] && ENV_KIND="linux"
 
 RAW_ARCH="$(uname -m)"
 # Normalize the many names Android/Termux report for the same CPU.
 case "$RAW_ARCH" in
-    aarch64|arm64|armv8b|armv8|arm64-v8a) ARCH="aarch64" ;;
-    armv8l|armv7l|armv7|armv7a|arm|armhf|armeabi-v7a) ARCH="arm" ;;   # 32-bit userland
-    x86_64|amd64) ARCH="x86_64" ;;
-    i686|i386|x86) ARCH="i686" ;;
-    *) ARCH="$RAW_ARCH" ;;
+    aarch64|arm64|armv8b|armv8|arm64-v8a|evbarm) ARCH="aarch64" ;;
+    armv8l|armv7l|armv7|armv7a|armv6l|arm|armhf|armel|armeabi-v7a) ARCH="arm" ;;   # 32-bit userland
+    x86_64|amd64|x64) ARCH="x86_64" ;;
+    i686|i386|i586|x86|ia32) ARCH="i686" ;;
+    riscv64|ppc64le|ppc64|s390x|mips|mips64|mips64el|loongarch64) ARCH="$RAW_ARCH" ;;
+    *) ARCH="${RAW_ARCH:-unknown}" ;;
 esac
 
 TMP="$(mktemp -d)"
@@ -235,17 +241,27 @@ setup_env() {
     case "$ENV_KIND" in
         termux)
             BIN_DIR="$PREFIX/bin"; STAMP_DIR="$PREFIX/libexec/opencode"; LIB_DIR="$PREFIX/lib";;
-        linux|macos|android)
-            BIN_DIR="$HOME/.local/bin"; STAMP_DIR="$HOME/.local/libexec/zyvo"; LIB_DIR="$HOME/.local/lib/zyvo"
-            mkdir -p "$BIN_DIR" "$STAMP_DIR" "$LIB_DIR";;
         *)
-            fatal "unsupported OS: $(uname -s)" "Run inside Termux (Android), Linux, or macOS."
-            ;;
+            # linux, macos, android, bsd, unix, windows (git-bash/msys), posix
+            BIN_DIR="${ZYVO_BIN_DIR:-$HOME/.local/bin}"
+            STAMP_DIR="$HOME/.local/libexec/zyvo"; LIB_DIR="$HOME/.local/lib/zyvo"
+            mkdir -p "$BIN_DIR" "$STAMP_DIR" "$LIB_DIR" 2>/dev/null || {
+                # read-only or exotic $HOME — keep going in a writable place
+                BIN_DIR="${TMPDIR:-/tmp}/zyvo/bin"; STAMP_DIR="${TMPDIR:-/tmp}/zyvo/libexec"
+                LIB_DIR="${TMPDIR:-/tmp}/zyvo/lib"
+                mkdir -p "$BIN_DIR" "$STAMP_DIR" "$LIB_DIR"
+            };;
     esac
     # No hard stop for 32-bit / uncommon CPUs any more: those devices fall
     # back to the Node (npm) build of the core, which is architecture neutral.
-    case "$ARCH" in
-        aarch64|x86_64) NATIVE_CORE=1 ;;
+    if [ -n "$ZYVO_FORCE_NODE" ]; then
+        NATIVE_CORE=0
+        status "forced Node core (ZYVO_FORCE_NODE)"
+        bump 2
+        return
+    fi
+    case "$ENV_KIND/$ARCH" in
+        termux/aarch64|termux/x86_64|linux/aarch64|linux/x86_64|macos/aarch64|macos/x86_64) NATIVE_CORE=1 ;;
         *)
             NATIVE_CORE=0
             printf "\r\033[K  ${C_Y}!${C_N} %s CPU has no native core build — using the Node build\n" "$RAW_ARCH"
@@ -256,26 +272,53 @@ setup_env() {
 }
 
 # ------------------------------------------------------------
+# Universal package installer — works on every mainstream package
+# manager; silently succeeds as a no-op when none is usable.
+# ------------------------------------------------------------
+SUDO=""
+if [ "$(id -u 2>/dev/null)" != "0" ] && [ "$ENV_KIND" != "termux" ] && cmd_exists sudo; then
+    SUDO="sudo"
+fi
+
+pm_install() { # <packages...>
+    [ $# -gt 0 ] || return 0
+    local label="installing deps"
+    if [ "$ENV_KIND" = "termux" ] && cmd_exists pkg; then
+        run_bg "$label (pkg)"     pkg install -y "$@" && return 0
+    fi
+    if cmd_exists apt-get;  then run_bg "$label (apt)"     $SUDO apt-get install -y "$@"        && return 0; fi
+    if cmd_exists dnf;      then run_bg "$label (dnf)"     $SUDO dnf install -y "$@"            && return 0; fi
+    if cmd_exists yum;      then run_bg "$label (yum)"     $SUDO yum install -y "$@"            && return 0; fi
+    if cmd_exists zypper;   then run_bg "$label (zypper)"  $SUDO zypper --non-interactive install "$@" && return 0; fi
+    if cmd_exists pacman;   then run_bg "$label (pacman)"  $SUDO pacman -Sy --noconfirm "$@"    && return 0; fi
+    if cmd_exists apk;      then run_bg "$label (apk)"     $SUDO apk add --no-cache "$@"        && return 0; fi
+    if cmd_exists xbps-install; then run_bg "$label (xbps)" $SUDO xbps-install -Sy "$@"         && return 0; fi
+    if cmd_exists emerge;   then run_bg "$label (emerge)"  $SUDO emerge -q "$@"                 && return 0; fi
+    if cmd_exists opkg;     then run_bg "$label (opkg)"    $SUDO opkg install "$@"              && return 0; fi
+    if cmd_exists brew;     then run_bg "$label (brew)"    brew install "$@"                    && return 0; fi
+    if cmd_exists port;     then run_bg "$label (port)"    $SUDO port -N install "$@"           && return 0; fi
+    if cmd_exists pkg_add;  then run_bg "$label (pkg_add)" $SUDO pkg_add "$@"                   && return 0; fi
+    if cmd_exists pacapt;   then run_bg "$label (pacapt)"  $SUDO pacapt -S --noconfirm "$@"     && return 0; fi
+    if cmd_exists choco;    then run_bg "$label (choco)"   choco install -y "$@"                && return 0; fi
+    if cmd_exists winget;   then run_bg "$label (winget)"  winget install --silent "$@"         && return 0; fi
+    return 1
+}
+
+# ------------------------------------------------------------
 # Step 2 — dependencies (auto-install missing, skip existing)
 # ------------------------------------------------------------
 setup_deps() {
     status "checking dependencies"
-    for d in curl tar; do
-        cmd_exists "$d" || fatal "missing required tool: $d" "Install it with your package manager, then rerun."
-    done
+    cmd_exists curl || cmd_exists wget \
+        || pm_install curl \
+        || fatal "missing required tool: curl" "Install curl (or wget) with your package manager, then rerun."
+    cmd_exists tar || pm_install tar \
+        || fatal "missing required tool: tar" "Install tar with your package manager, then rerun."
     local WANT="python3 ripgrep unzip git" MISSING="" p
     for p in $WANT; do cmd_exists "$p" || MISSING="$MISSING $p"; done
 
     if [ -n "$MISSING" ]; then
-        if [ "$ENV_KIND" = "termux" ] && cmd_exists pkg && [ "$(id -u)" != "0" ]; then
-            run_bg "installing deps (pkg)" pkg install -y $MISSING || warn_deps "$MISSING"
-        elif [ "$ENV_KIND" = "termux" ] && cmd_exists apt-get; then
-            run_bg "installing deps (apt)" apt-get install -y $MISSING || warn_deps "$MISSING"
-        elif [ "$ENV_KIND" = "linux" ] && cmd_exists apt-get; then
-            run_bg "installing deps (apt)" apt-get install -y $MISSING || warn_deps "$MISSING"
-        else
-            status "missing (skip):$MISSING"
-        fi
+        pm_install $MISSING || warn_deps "$MISSING"
     else
         status "dependencies ok (skip)"
     fi
@@ -289,30 +332,68 @@ warn_deps() {
 # ------------------------------------------------------------
 # Step 3 — core engine (delta aware)
 # ------------------------------------------------------------
+install_portable_node() { # last resort: official Node tarball into $LIB_DIR
+    local nver="v22.14.0" nos narch url
+    case "$ENV_KIND" in
+        macos) nos="darwin" ;;
+        linux|android|termux|posix) nos="linux" ;;
+        *) return 1 ;;
+    esac
+    case "$ARCH" in
+        aarch64) narch="arm64" ;;
+        x86_64)  narch="x64" ;;
+        arm)     narch="armv7l" ;;
+        ppc64le) narch="ppc64le" ;;
+        s390x)   narch="s390x" ;;
+        *) return 1 ;;
+    esac
+    url="https://nodejs.org/dist/$nver/node-$nver-$nos-$narch.tar.gz"
+    status "downloading Node runtime ($narch)"
+    download_file "$url" "$TMP/node.tar.gz" "downloading node" || return 1
+    mkdir -p "$LIB_DIR/node"
+    tar -xzf "$TMP/node.tar.gz" -C "$LIB_DIR/node" --strip-components=1 >> "$LOG" 2>&1 || return 1
+    PATH="$LIB_DIR/node/bin:$PATH"; export PATH
+    cmd_exists npm
+}
+
 setup_core_npm() { # architecture-neutral fallback (32-bit ARM, x86, odd ROMs)
     status "preparing Node core (no native build for $RAW_ARCH)"
-    if ! cmd_exists node || ! cmd_exists npm; then
-        if [ "$ENV_KIND" = "termux" ] && cmd_exists pkg; then
-            run_bg "installing nodejs" pkg install -y nodejs-lts || true
-        elif cmd_exists apt-get; then
-            run_bg "installing nodejs" apt-get install -y nodejs npm || true
+    if ! cmd_exists npm; then
+        if [ "$ENV_KIND" = "termux" ]; then
+            pm_install nodejs-lts || pm_install nodejs || true
+        else
+            pm_install nodejs npm || pm_install nodejs || pm_install node || true
         fi
     fi
-    cmd_exists npm || fatal "node/npm not available for $RAW_ARCH" \
-        "Install Node (pkg install nodejs-lts) and rerun the installer."
+    cmd_exists npm || install_portable_node || true
+    if ! cmd_exists npm; then
+        fatal "could not install Node for $ENV_KIND/$RAW_ARCH" \
+            "Install Node.js manually (e.g. pkg install nodejs-lts / apt install nodejs npm), then rerun."
+    fi
 
     mkdir -p "$BIN_DIR" "$STAMP_DIR" "$LIB_DIR"
     run_bg "installing core (npm)" npm install -g opencode-ai \
         || fatal "npm core install failed" "Check your internet, then rerun."
 
-    local target
-    target="$(command -v opencode 2>/dev/null || true)"
-    [ -n "$target" ] || target="$(npm root -g 2>/dev/null)/opencode-ai/bin/opencode"
-    [ -e "$target" ] || fatal "core binary missing after npm install" \
+    local target="" c nroot nprefix
+    nroot="$(npm root -g 2>/dev/null)"
+    nprefix="$(npm config get prefix 2>/dev/null)"
+    for c in \
+        "$(command -v opencode 2>/dev/null)" \
+        "$nprefix/bin/opencode" \
+        "$nprefix/opencode" \
+        "$nroot/opencode-ai/bin/opencode" \
+        "$nroot/opencode-ai/bin/opencode.exe" \
+        "$LIB_DIR/node/bin/opencode"
+    do
+        [ -n "$c" ] && [ -x "$c" ] && { target="$c"; break; }
+    done
+    [ -n "$target" ] || fatal "core binary missing after npm install" \
         "Run: npm install -g opencode-ai  and check its output."
 
     # shim so every launcher path keeps working unchanged
-    printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$target" > "$STAMP_DIR/opencode.bin"
+    printf '#!/usr/bin/env sh\nPATH="%s:$PATH"; export PATH\nexec "%s" "$@"\n' \
+        "$LIB_DIR/node/bin" "$target" > "$STAMP_DIR/opencode.bin"
     chmod 755 "$STAMP_DIR/opencode.bin"
     printf 'npm' > "$STAMP_DIR/zyvo-core-kind"
     status "core installed (node build)"
@@ -400,11 +481,21 @@ setup_core() {
             bump 70
             return
         fi
-        run_bg "installing official core" bash -c \
-            "curl -fsSL --retry 3 --connect-timeout 15 --max-time 120 -o '$TMP/oc-install.sh' '$OPENCODE_INSTALL_URL' && bash '$TMP/oc-install.sh'" \
-            || fatal "official core install failed" "Run: bash ~/.opencode/bin/install.sh to see its log."
-        [ -x "$check" ] || fatal "official core missing after install" "The opencode installer did not produce a binary."
+        if ! run_bg "installing official core" bash -c \
+            "curl -fsSL --retry 3 --connect-timeout 15 --max-time 120 -o '$TMP/oc-install.sh' '$OPENCODE_INSTALL_URL' && bash '$TMP/oc-install.sh'"; then
+            printf "\r\033[K  ${C_Y}!${C_N} official core installer failed — using the Node build\n"
+            setup_core_npm
+            return
+        fi
+        if [ ! -x "$check" ]; then
+            setup_core_npm
+            return
+        fi
         cp "$check" "$STAMP_DIR/opencode.bin"; chmod 755 "$STAMP_DIR/opencode.bin"
+        if ! "$STAMP_DIR/opencode.bin" --version >/dev/null 2>&1; then
+            setup_core_npm
+            return
+        fi
         [ -n "$tag" ] && printf '%s' "$tag" > "$STAMP_DIR/zyvo-core-version"
         status "core installed (official)"
         bump 70
