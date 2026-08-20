@@ -2,6 +2,8 @@
 # zyvo-vision — Vision bridge for ZYVO CLI
 # Uses OpenCode Zen (mimo-v2.5-free) / Gemini Flash to describe images and videos
 # Supports: .jpg .png .webp .gif .mp4 .mov .webm
+# Model override: ZYVO_VISION_MODEL=<id> (default mimo-v2.5-free)
+# Zen key priority: ZYVO_VISION_KEY > ~/.config/zyvo/vision-zen.key > OPENCODE_API_KEY > built-in default
 
 set -e
 
@@ -29,12 +31,17 @@ else
     exit 1
 fi
 
-ZEN_KEYS="${OPENCODE_API_KEY:-sk-PKOWRt2391BL0MP3W90yaG8qx4vofQJQgigJreBBYjrArj0lwuU1HkWUqOHgDGHP}"
+ZEN_VISION_KEY_FILE="${HOME}/.config/zyvo/vision-zen.key"
+if [ -z "${ZYVO_VISION_KEY:-}" ] && [ -f "$ZEN_VISION_KEY_FILE" ]; then
+    ZYVO_VISION_KEY="$(tr -d '[:space:]' < "$ZEN_VISION_KEY_FILE" 2>/dev/null)"
+fi
+ZEN_KEYS="${ZYVO_VISION_KEY:-${OPENCODE_API_KEY:-sk-ZPCle2mleCGMXodtxMtbcQ5s9TUnJJvlRgiU52aukgGViDjFJj2FtOBHb3QRbcrs}}"
 VISION_KEY_FILE="${HOME}/.config/zyvo/vision.key"
 GEMINI_KEYS="${GEMINI_API_KEY:-}"
 [ -f "$VISION_KEY_FILE" ] && GEMINI_KEYS="${GEMINI_KEYS:-}$(cat "$VISION_KEY_FILE" 2>/dev/null || true)"
+VISION_MODEL="${ZYVO_VISION_MODEL:-mimo-v2.5-free}"
 
-exec "$PY" - "$FILE" "$PROMPT" "$ZEN_KEYS" "$GEMINI_KEYS" <<'PYVIS'
+exec "$PY" - "$FILE" "$PROMPT" "$ZEN_KEYS" "$GEMINI_KEYS" "$VISION_MODEL" <<'PYVIS'
 import sys, os, base64, json, subprocess, urllib.request, urllib.error, re, tempfile, time
 
 # Termux python stdout is broken in some builds — write directly to fd 1.
@@ -55,6 +62,7 @@ file_path = os.path.abspath(sys.argv[1])
 prompt = sys.argv[2]
 raw_zen = sys.argv[3]
 raw_gemini = sys.argv[4] if len(sys.argv) > 4 else ""
+model = sys.argv[5] if len(sys.argv) > 5 else "mimo-v2.5-free"
 
 zen_keys = [k.strip() for k in re.split(r'[,;\s\n]+', raw_zen) if k.strip()]
 gemini_keys = [k.strip() for k in re.split(r'[,;\s\n]+', raw_gemini) if k.strip()]
@@ -73,11 +81,11 @@ mime_map = {
 mime = mime_map.get(ext, "image/jpeg")
 is_video = ext in ("mp4", "mov", "webm")
 
-def analyze_zen_mimo(b64_data, mime_type, custom_prompt, key):
+def analyze_zen_mimo(b64_data, mime_type, custom_prompt, key, model):
     url = "https://opencode.ai/zen/v1/chat/completions"
     data_url = f"data:{mime_type};base64,{b64_data}"
     payload = {
-        "model": "mimo-v2.5-free",
+        "model": model,
         "messages": [
             {
                 "role": "user",
@@ -102,13 +110,13 @@ def analyze_zen_mimo(b64_data, mime_type, custom_prompt, key):
         data = json.loads(resp.read().decode("utf-8"))
         return data["choices"][0]["message"]["content"]
 
-def analyze_zen_retry(b64_data, mime_type, custom_prompt, keys):
+def analyze_zen_retry(b64_data, mime_type, custom_prompt, keys, model):
     """Rate limit (429) → wait 12s, retry up to 4 rounds across the key pool."""
     errors = []
     for attempt in range(4):
         for k in keys:
             try:
-                res = analyze_zen_mimo(b64_data, mime_type, custom_prompt, k)
+                res = analyze_zen_mimo(b64_data, mime_type, custom_prompt, k, model)
                 if res:
                     return res
             except urllib.error.HTTPError as e:
@@ -150,8 +158,8 @@ def analyze_frame(img_path, frame_prompt):
     errors = []
 
     # 1. Try all Zen mimo keys in pool (with 429 retry)
-    res = analyze_zen_retry(b64, frame_mime, frame_prompt, zen_keys)
-    if res and not res.startswith("[Analysis error"):
+    res = analyze_zen_retry(b64, frame_mime, frame_prompt, zen_keys, model)
+    if res and not (res.startswith("[Zen error") or res.startswith("[Analysis error")):
         return res
     if res:
         errors.append(res)
