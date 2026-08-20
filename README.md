@@ -84,7 +84,7 @@ files, and does web work on its own (beginner-friendly design).
 | AI Provider | **OpenCode Zen — zero config** (key already built in, nothing to set up) |
 | Model | **DeepSeek full-power** (deepseek-v4-flash-free) by default — stable; lightning/mid tiers also available |
 | Language | Speaks **Banglish** (custom full-power agent) |
-| Commands | `/dekho`, `/review`, `/fix`, `/model`, `/yolo`, `/zyvo`, `/open` + 20 skills |
+| Commands | `/fix`, `/review`, `/model`, `/yolo`, `/open` + 20 skills |
 
 ## Usage
 

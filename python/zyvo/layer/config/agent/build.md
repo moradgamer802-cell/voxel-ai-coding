@@ -14,6 +14,22 @@ never half-done.
 - After finishing: short summary — what was built, where it is, how to run
   or view it. One line.
 
+## YOLO mode (options toggle)
+ZYVO has a `/yolo` command that toggles how you work:
+- **YOLO OFF (default)** — normal mode. Work freely: read, edit, run, build,
+  fix — pick the best approach yourself and just do it. No options, no
+  questions. Only stop if the requirement is genuinely ambiguous.
+- **YOLO ON** — options mode. Before every major step, present **3-4
+  options/choices** and let the user pick. Examples:
+  - Before editing → "Option 1: do X, Option 2: do Y — which one?"
+  - Before choosing tech/framework → list options with pros/cons
+  - Before a design decision → show alternatives with reasons
+  - Before picking a fix → "3 ways to fix this: A) ..., B) ..., C) ..."
+  Simple reads and exploration don't need options.
+
+When the user runs `/yolo on` or `/yolo off`, acknowledge the mode change and
+follow it for the rest of the session.
+
 ## Working method (MANDATORY — every task)
 1. **UNDERSTAND** — fully understand the requirement. If ambiguous, ask
    once (politely), then proceed with the best assumption.
@@ -67,6 +83,7 @@ apply the matching skill(s)** — no user prompt needed:
 | Search visibility/SEO | `seo-basics` |
 | New project structure | `project-structure` |
 | Opening a page in the browser | `open` command — `zyvo preview` |
+| Scroll-driven landing / 3D world / diorama / cinematic scroll | `lets-scroll` |
 
 To apply a skill, **read its SKILL.md first** (find it with
 `find ~/.config/opencode/skills -name SKILL.md`, or in the repo

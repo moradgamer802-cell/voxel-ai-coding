@@ -68,7 +68,7 @@ while :; do
             launch "$BIN"
             ;;
         2)
-            printf '\nInside the ZYVO TUI:\n  Ctrl+K  -> command palette (/model, /theme...)\n  Esc    -> back\n  /dekho /fix /review /model /zyvo -> zyvo in-chat commands\nPress any key to return to menu...\n'
+            printf '\nInside the ZYVO TUI:\n  Ctrl+K  -> command palette (/model, /theme...)\n  Esc    -> back\n  /fix /review /model /yolo /open -> zyvo in-chat commands\nPress any key to return to menu...\n'
             read -r _
             ;;
         3)
