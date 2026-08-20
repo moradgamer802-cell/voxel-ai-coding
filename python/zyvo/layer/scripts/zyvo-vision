@@ -29,18 +29,21 @@ else
     exit 1
 fi
 
-ZEN_KEY="${OPENCODE_API_KEY:-sk-PKOWRt2391BL0MP3W90yaG8qx4vofQJQgigJreBBYjrArj0lwuU1HkWUqOHgDGHP}"
+ZEN_KEYS="${OPENCODE_API_KEY:-sk-PKOWRt2391BL0MP3W90yaG8qx4vofQJQgigJreBBYjrArj0lwuU1HkWUqOHgDGHP}"
 VISION_KEY_FILE="${HOME}/.config/zyvo/vision.key"
-GEMINI_KEY="${GEMINI_API_KEY:-}"
-[ -z "$GEMINI_KEY" ] && [ -f "$VISION_KEY_FILE" ] && GEMINI_KEY="$(cat "$VISION_KEY_FILE" | tr -d '[:space:]')"
+GEMINI_KEYS="${GEMINI_API_KEY:-}"
+[ -f "$VISION_KEY_FILE" ] && GEMINI_KEYS="${GEMINI_KEYS:-}$(cat "$VISION_KEY_FILE" 2>/dev/null || true)"
 
-exec "$PY" - "$FILE" "$PROMPT" "$ZEN_KEY" "$GEMINI_KEY" <<'PYVIS'
-import sys, os, base64, json, subprocess, urllib.request, urllib.error
+exec "$PY" - "$FILE" "$PROMPT" "$ZEN_KEYS" "$GEMINI_KEYS" <<'PYVIS'
+import sys, os, base64, json, subprocess, urllib.request, urllib.error, re
 
 file_path = os.path.abspath(sys.argv[1])
 prompt = sys.argv[2]
-zen_key = sys.argv[3]
-gemini_key = sys.argv[4] if len(sys.argv) > 4 else ""
+raw_zen = sys.argv[3]
+raw_gemini = sys.argv[4] if len(sys.argv) > 4 else ""
+
+zen_keys = [k.strip() for k in re.split(r'[,;\s\n]+', raw_zen) if k.strip()]
+gemini_keys = [k.strip() for k in re.split(r'[,;\s\n]+', raw_gemini) if k.strip()]
 
 ext = os.path.splitext(file_path)[1].lower().lstrip(".")
 mime_map = {
@@ -56,7 +59,7 @@ mime_map = {
 mime = mime_map.get(ext, "image/jpeg")
 is_video = ext in ("mp4", "mov", "webm")
 
-def analyze_zen_mimo(b64_data, mime_type, custom_prompt):
+def analyze_zen_mimo(b64_data, mime_type, custom_prompt, key):
     url = "https://opencode.ai/zen/v1/chat/completions"
     data_url = f"data:{mime_type};base64,{b64_data}"
     payload = {
@@ -77,22 +80,14 @@ def analyze_zen_mimo(b64_data, mime_type, custom_prompt):
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {zen_key}"
+            "Authorization": f"Bearer {key}"
         }
     )
-    try:
-        with urllib.request.urlopen(req, timeout=45) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data["choices"][0]["message"]["content"]
-    except urllib.error.HTTPError as e:
-        err_msg = e.read().decode("utf-8", errors="ignore")
-        raise RuntimeError(f"Zen API error ({e.code}): {err_msg}")
-    except Exception as e:
-        raise RuntimeError(f"Zen request failed: {e}")
+    with urllib.request.urlopen(req, timeout=40) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+        return data["choices"][0]["message"]["content"]
 
 def analyze_gemini(b64_data, mime_type, custom_prompt, key):
-    if not key:
-        return None
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}"
     payload = {
         "contents": [{
@@ -107,29 +102,38 @@ def analyze_gemini(b64_data, mime_type, custom_prompt, key):
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"}
     )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception:
-        return None
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+        return data["candidates"][0]["content"]["parts"][0]["text"]
 
 def analyze_frame(img_path, frame_prompt):
     with open(img_path, "rb") as fh:
         b64 = base64.b64encode(fh.read()).decode("utf-8")
     
-    # Try Zen mimo-v2.5-free first
-    try:
-        res = analyze_zen_mimo(b64, "image/jpeg" if is_video else mime, frame_prompt)
-        if res:
-            return res
-    except Exception as zen_err:
-        # Fallback to Gemini if configured
-        if gemini_key:
-            res = analyze_gemini(b64, "image/jpeg" if is_video else mime, frame_prompt, gemini_key)
+    frame_mime = "image/jpeg" if is_video else mime
+    errors = []
+
+    # 1. Try all Zen mimo keys in pool
+    for k in zen_keys:
+        try:
+            res = analyze_zen_mimo(b64, frame_mime, frame_prompt, k)
             if res:
                 return res
-        return f"[Analysis error: {zen_err}]"
+        except Exception as e:
+            errors.append(f"Zen key (...{k[-6:] if len(k)>6 else k}): {e}")
+            continue
+
+    # 2. Try all Gemini keys in pool (fallback)
+    for gk in gemini_keys:
+        try:
+            res = analyze_gemini(b64, frame_mime, frame_prompt, gk)
+            if res:
+                return res
+        except Exception as e:
+            errors.append(f"Gemini key (...{gk[-6:] if len(gk)>6 else gk}): {e}")
+            continue
+
+    return f"[Analysis error across all keys: {'; '.join(errors[-2:])}]"
 
 if is_video:
     import tempfile, shutil
