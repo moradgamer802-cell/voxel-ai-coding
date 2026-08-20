@@ -84,7 +84,7 @@ files, and does web work on its own (beginner-friendly design).
 | AI Provider | **OpenCode Zen — zero config** (key already built in, nothing to set up) |
 | Model | **DeepSeek full-power** (deepseek-v4-flash-free) by default — stable; lightning/mid tiers also available |
 | Language | Speaks **Banglish** (custom full-power agent) |
-| Commands | `/fix`, `/review`, `/model`, `/yolo`, `/open` + 20 skills |
+| Commands | `/dekho`, `/review`, `/fix`, `/model`, `/yolo`, `/zyvo`, `/open` + 20 skills |
 
 ## Usage
 
@@ -101,14 +101,15 @@ oc-settings          # model tier menu
 ### YOLO mode
 
 ```bash
-/yolo on             # AI asks before every action (confirm mode)
+/yolo on             # AI presents 3-4 options before major steps (options mode)
 /yolo off            # normal — AI works freely, no extra questions (default)
 /yolo                # show current mode + toggle
 ```
 
-When YOLO is **on**, the AI confirms before editing files, running commands,
-or making design decisions. When **off** (default), it works at full speed
-with no interruptions — the way ZYVO normally works.
+When YOLO is **on**, the AI presents 3-4 options/choices before major steps
+(editing files, choosing tech, design decisions, bug fixes). When **off**
+(default), it works at full speed with no interruptions — the way ZYVO
+normally works.
 
 ### Sessions (separate projects)
 

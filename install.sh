@@ -572,7 +572,7 @@ PYC
     cp -f "$TMP"/config/agent/*.md    "$CONFIG_DIR/agent/"   2>/dev/null || true
     cp -f "$TMP"/config/command/*.md  "$CONFIG_DIR/command/" 2>/dev/null || true
     cp -f "$TMP"/config/themes/*.json "$CONFIG_DIR/themes/"  2>/dev/null || true
-    cp -rn "$TMP"/skills/*            "$CONFIG_DIR/skills/"  2>/dev/null || true
+    cp -rf "$TMP"/skills/*            "$CONFIG_DIR/skills/"  2>/dev/null || true
 
     status "config + skills installed"
     bump 85

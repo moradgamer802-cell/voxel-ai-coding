@@ -68,7 +68,7 @@ pick_model() {
     echo
     echo "  Select a model tier:"
     echo "  1) Max (default)  : deepseek-v4-flash-free [full-power, stable]"
-    echo "  2) Lightning      : nematron-3.5-lightning-free"
+    echo "  2) Lightning      : nemotron-3.5-lightning-free"
     echo "  3) Mid            : mimo-v2.5-free"
     echo "  4) Nemotron Ultra : nemotron-3-ultra-free [! provider errors reported — experimental]"
     echo "  5) Custom ID      (e.g. gpt-5.5)"
@@ -77,7 +77,7 @@ pick_model() {
     case "$CHOICE" in
         1) MODEL="deepseek-v4-flash-free"
            SMALL="laguna-s-2.1-free";;
-        2) MODEL="nematron-3.5-lightning-free"
+        2) MODEL="nemotron-3.5-lightning-free"
            SMALL="laguna-s-2.1-free";;
         3) MODEL="mimo-v2.5-free"
            SMALL="laguna-s-2.1-free";;
