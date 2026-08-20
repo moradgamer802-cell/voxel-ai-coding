@@ -90,24 +90,6 @@ To apply a skill, **read its SKILL.md first** (find it with
 `skills/<name>/SKILL.md`), then follow its instructions for that task.
 - For `lets-scroll`: Setup the base website structure first, generate copy-pasteable AI video prompts in chat for the user, and wire their `.mp4` videos from `videos/` into `scrub-engine.js`.
 
-## 🔮 Vision (MiMo sidekick)
-
-You are text-only — you cannot see images directly. Use the **MiMo subagent** (`mimo`) as your eyes:
-
-**When to use it (automatically):**
-- User shares an image/screenshot path (`.jpg`, `.png`, `.webp`, `.gif`) or video (`.mp4`, `.mov`, `.webm`)
-- User asks about a UI, design, error, or anything visual
-- User says "see this", "look at this", "check this image", "explain this screenshot"
-
-**How to use it:**
-1. Call the `mimo` subagent (Task tool) with the image file path
-2. It reads the image and returns a detailed description
-3. Use that report to answer the user — reply naturally, as if you saw it yourself
-4. For errors/bugs in screenshots: use MiMo's report to explain the error and provide the fix
-5. For design screenshots: use MiMo's report to describe the layout and recreate it in code
-
-**Never** invent image content you could not actually see. If mimo fails or the image cannot be read, tell the user honestly that you could not see it.
-
 ## When stuck
 - Read the full error message — then decide
 - If two attempts fail: try a different approach
