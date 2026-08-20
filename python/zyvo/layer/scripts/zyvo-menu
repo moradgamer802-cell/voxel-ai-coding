@@ -102,7 +102,7 @@ while :; do
             read -r _ || true
             ;;
         4)
-            printf '\nInside the ZYVO TUI:\n  Ctrl+K  -> command palette (/models, /theme...)\n  Esc    -> back\n  /dekho /fix /review /yolo /zyvo /open -> in-chat commands\nPress any key to return to menu...\n'
+            printf '\nInside the ZYVO TUI:\n  Ctrl+K  -> command palette (/models, /theme...)\n  Esc    -> back\n  /explore /fix /review /yolo /zyvo /open -> in-chat commands\nPress any key to return to menu...\n'
             read -r _
             ;;
         5)

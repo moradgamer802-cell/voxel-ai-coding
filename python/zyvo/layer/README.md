@@ -85,7 +85,7 @@ files, and does web work on its own (beginner-friendly design).
 | Model | **DeepSeek full-power** (deepseek-v4-flash-free) by default — stable; lightning/mid tiers also available |
 | Vision Eyes | **Built-in Gemini Flash Bridge** — AI can automatically see images, screenshots & video frames! |
 | Language | Speaks **Banglish** (custom full-power agent) |
-| Commands | `/dekho`, `/review`, `/fix`, `/yolo`, `/zyvo`, `/open` + 20 skills |
+| Commands | `/explore`, `/review`, `/fix`, `/yolo`, `/zyvo`, `/open` + 20 skills |
 
 ## Usage
 
