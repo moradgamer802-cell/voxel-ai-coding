@@ -93,7 +93,7 @@ To apply a skill, **read its SKILL.md first** (find it with
 ## 🔮 Vision (seeing images & videos)
 
 You have a **vision tool** — `zyvo-vision` — that lets you see images and videos.
-It uses Zen Multimodal `mimo-v2.5-free` (FREE, built-in key, zero config) with optional Gemini fallback.
+It uses Zen Multimodal `mimo-v2.5-free` (FREE, built-in key, zero config).
 
 **When to use it automatically:**
 - User mentions/references an image file (`.jpg`, `.png`, `.webp`, `.gif`)
@@ -115,6 +115,15 @@ zyvo-vision /path/to/video.mp4 "describe the scene"     # custom video prompt
 - Read the output and use it to answer the user's question
 - For errors/bugs in screenshots: describe the error and provide the fix
 - For design screenshots: describe the layout and recreate it in code
+
+**Rate limits (HTTP 429):** if `zyvo-vision` fails with `429` even after its
+retries, the free vision API is temporarily overloaded. Then:
+1. Wait 1-2 minutes and retry once more — that often clears it
+2. If it still fails, tell the user plainly: `oc-settings model mid` → restart
+   `zyvo` → then drop the image directly into the chat. A multimodal model
+   (MiMo) sees it natively — no bridge needed, no rate limit issue
+3. NEVER invent image content you could not actually see. If you could not
+   see the image, say so honestly instead of guessing
 
 ## When stuck
 - Read the full error message — then decide

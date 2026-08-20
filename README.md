@@ -95,7 +95,6 @@ zyvo coffee-shop       # open/create zyvo/coffee-shop/ project folder
 zyvo ls                # list all project folders
 zyvo preview           # local preview + auto-open in browser (http://localhost:8080)
 zyvo share             # instant live Public HTTPS link (share with anyone on phone/PC)
-zyvo setup-vision      # set custom Gemini Vision key (built-in free key already active!)
 zyvo update            # delta update check (0 MB if core is unchanged)
 zyvo uninstall         # cleanly remove ZYVO (keeps your projects)
 oc-settings            # model tier menu

@@ -62,45 +62,6 @@ if [ "${1:-}" = "uninstall" ]; then
     exit 1
 fi
 
-# ---- load vision key ----
-# Built-in FREE Gemini Flash key (zero config — vision works out of the box)
-_ZYVO_B64_KEY="QVEuQWI4Uk42THJiZ2JKVllab3lBc3Z2VWp3dG4wanVBR01VVnhpS3RJQ2haSW9JdTF4OXc="
-VISION_KEY_FILE="${HOME}/.config/zyvo/vision.key"
-if [ -z "${GEMINI_API_KEY:-}" ]; then
-    if [ -f "$VISION_KEY_FILE" ]; then
-        export GEMINI_API_KEY="$(cat "$VISION_KEY_FILE" | tr -d '[:space:]')"
-    else
-        export GEMINI_API_KEY="$(printf '%s' "$_ZYVO_B64_KEY" | base64 -d 2>/dev/null || printf '%s' "$_ZYVO_B64_KEY" | base64 -D 2>/dev/null || true)"
-    fi
-fi
-
-# ---- zyvo setup-vision: one-time Gemini API key setup (FREE) ----
-if [ "${1:-}" = "setup-vision" ]; then
-    shift
-    mkdir -p "${HOME}/.config/zyvo" 2>/dev/null || true
-    echo ""
-    echo "🔮 ZYVO Vision Setup (FREE — Google Gemini Flash)"
-    echo "=================================================="
-    echo ""
-    echo "1. Go to: https://aistudio.google.com/apikey"
-    echo "2. Sign in with Google account"
-    echo "3. Click 'Create API Key' → Copy the key"
-    echo ""
-    printf "Paste your Gemini API key here: "
-    read -r key
-    if [ -z "$key" ]; then
-        echo "❌ No key entered. Run 'zyvo setup-vision' again."
-        exit 1
-    fi
-    echo "$key" > "$VISION_KEY_FILE"
-    chmod 600 "$VISION_KEY_FILE"
-    echo ""
-    echo "✅ Vision key saved! AI can now see images & videos."
-    echo "   Test: zyvo-vision /path/to/photo.jpg"
-    echo ""
-    exit 0
-fi
-
 # ---- zyvo preview / zyvo share: local server + public HTTPS tunnel + auto-open ----
 # Browsers block scripts/fetch/CSS on file:// URLs, so serving over HTTP/HTTPS fixes it.
 # Usage:
