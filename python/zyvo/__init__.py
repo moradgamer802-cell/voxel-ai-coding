@@ -6,4 +6,4 @@ hands over to the real installer (install.sh) which does everything
 else (core engine, deps, single-line live progress).
 """
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"

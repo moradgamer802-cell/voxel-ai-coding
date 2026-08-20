@@ -35,7 +35,21 @@ GEMINI_KEYS="${GEMINI_API_KEY:-}"
 [ -f "$VISION_KEY_FILE" ] && GEMINI_KEYS="${GEMINI_KEYS:-}$(cat "$VISION_KEY_FILE" 2>/dev/null || true)"
 
 exec "$PY" - "$FILE" "$PROMPT" "$ZEN_KEYS" "$GEMINI_KEYS" <<'PYVIS'
-import sys, os, base64, json, subprocess, urllib.request, urllib.error, re
+import sys, os, base64, json, subprocess, urllib.request, urllib.error, re, tempfile, time
+
+# Termux python stdout is broken in some builds — write directly to fd 1.
+def out(s):
+    try:
+        os.write(1, (str(s) + "\n").encode("utf-8", "replace"))
+    except Exception:
+        pass
+
+# Termux has no /tmp — honor TMPDIR/TEMP/TMP before Python's /tmp default.
+for _t in ("TMPDIR", "TEMP", "TMP"):
+    _d = os.environ.get(_t)
+    if _d and os.path.isdir(_d):
+        tempfile.tempdir = _d
+        break
 
 file_path = os.path.abspath(sys.argv[1])
 prompt = sys.argv[2]
@@ -80,12 +94,34 @@ def analyze_zen_mimo(b64_data, mime_type, custom_prompt, key):
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {key}"
+            "Authorization": f"Bearer {key}",
+            "User-Agent": "zyvo-vision/0.3.1 (Termux)"
         }
     )
-    with urllib.request.urlopen(req, timeout=40) as resp:
+    with urllib.request.urlopen(req, timeout=60) as resp:
         data = json.loads(resp.read().decode("utf-8"))
         return data["choices"][0]["message"]["content"]
+
+def analyze_zen_retry(b64_data, mime_type, custom_prompt, keys):
+    """Rate limit (429) → wait 12s, retry up to 4 rounds across the key pool."""
+    errors = []
+    for attempt in range(4):
+        for k in keys:
+            try:
+                res = analyze_zen_mimo(b64_data, mime_type, custom_prompt, k)
+                if res:
+                    return res
+            except urllib.error.HTTPError as e:
+                errors.append(f"Zen (...{k[-6:] if len(k) > 6 else k}): HTTP {e.code}")
+                if e.code == 429:
+                    time.sleep(12)
+                else:
+                    return f"[Zen error: HTTP {e.code}]"
+            except Exception as e:
+                errors.append(f"Zen (...{k[-6:] if len(k) > 6 else k}): {e}")
+        if attempt < 3:
+            time.sleep(5)
+    return f"[Analysis error across all keys: {'; '.join(errors[-2:])}]"
 
 def analyze_gemini(b64_data, mime_type, custom_prompt, key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}"
@@ -113,15 +149,12 @@ def analyze_frame(img_path, frame_prompt):
     frame_mime = "image/jpeg" if is_video else mime
     errors = []
 
-    # 1. Try all Zen mimo keys in pool
-    for k in zen_keys:
-        try:
-            res = analyze_zen_mimo(b64, frame_mime, frame_prompt, k)
-            if res:
-                return res
-        except Exception as e:
-            errors.append(f"Zen key (...{k[-6:] if len(k)>6 else k}): {e}")
-            continue
+    # 1. Try all Zen mimo keys in pool (with 429 retry)
+    res = analyze_zen_retry(b64, frame_mime, frame_prompt, zen_keys)
+    if res and not res.startswith("[Analysis error"):
+        return res
+    if res:
+        errors.append(res)
 
     # 2. Try all Gemini keys in pool (fallback)
     for gk in gemini_keys:
@@ -156,23 +189,23 @@ if is_video:
                 frames.append((i+1, t, out_img))
 
         if not frames:
-            print("❌ ffmpeg could not extract frames from video.")
+            out("❌ ffmpeg could not extract frames from video.")
             sys.exit(1)
 
-        print(f"🎬 Video Analysis ({os.path.basename(file_path)}, {duration}s):\n")
+        out(f"🎬 Video Analysis ({os.path.basename(file_path)}, {duration}s):\n")
         labels = ["Opening / Start", "Middle Scene", "Ending / Payoff"]
         for i, t, fpath in frames:
             lbl = labels[i-1] if i <= len(labels) else f"Frame {i}"
             fprompt = f"This is frame {i} of 3 ({lbl}, at {t}s) from video {os.path.basename(file_path)}. {prompt}"
             desc = analyze_frame(fpath, fprompt)
-            print(f"--- Frame {i} [{lbl} at {t}s] ---")
-            print(desc)
-            print()
+            out(f"--- Frame {i} [{lbl} at {t}s] ---")
+            out(desc)
+            out("")
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 else:
-    print(f"📷 Image Analysis ({os.path.basename(file_path)}):\n")
+    out(f"📷 Image Analysis ({os.path.basename(file_path)}):\n")
     desc = analyze_frame(file_path, prompt)
-    print(desc)
+    out(desc)
 
 PYVIS

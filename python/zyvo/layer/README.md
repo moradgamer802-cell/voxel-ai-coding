@@ -99,7 +99,33 @@ zyvo setup-vision      # set custom Gemini Vision key (built-in free key already
 zyvo update            # delta update check (0 MB if core is unchanged)
 zyvo uninstall         # cleanly remove ZYVO (keeps your projects)
 oc-settings            # model tier menu
+zyvo-vision <file>     # AI describes any image or video (free, zero config)
+zyvo-browser <url>     # AI reads a web page and answers questions about it
+zyvo-browser search "query"  # real-time web search with AI summary
 ```
+
+### Vision Eyes (see images & videos — free)
+```bash
+zyvo-vision photo.jpg                     # describe an image
+zyvo-vision video.mp4                     # analyze 3 frames (start / middle / end)
+zyvo-vision photo.png "Read the error text"  # custom question
+```
+
+Powered by Zen Multimodal (`mimo-v2.5-free`). Built-in free key — zero
+config; override with `OPENCODE_API_KEY`. Rate limits are handled
+automatically (12s wait + retry). Videos use ffmpeg to grab 3 frames.
+
+### Web Reader & Real-Time Search
+```bash
+zyvo-browser https://example.com "What does this page say?"  # read any page
+zyvo-browser search "termux github"                          # real-time web search
+zyvo-browser search "today cricket score" 5                  # top 5 results
+```
+
+Fetches a page, strips the HTML and lets the AI answer in detail. Search
+mode queries DuckDuckGo in real time and summarizes the results with sources.
+Uses `nemotron-3-ultra-free` (fast ~3s, long-text capable) — override with
+`ZYVO_BROWSER_MODEL=deepseek-v4-flash-free`.
 
 ### YOLO mode
 

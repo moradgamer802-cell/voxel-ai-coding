@@ -536,6 +536,7 @@ setup_layer() {
     # wrapper + helpers
     install_script "$TMP/scripts/zyvo" "$BIN_DIR/zyvo"
     [ -f "$TMP/scripts/zyvo-menu" ]     && install_script "$TMP/scripts/zyvo-menu" "$BIN_DIR/zyvo-menu"
+    [ -f "$TMP/scripts/zyvo-browser" ]  && install_script "$TMP/scripts/zyvo-browser" "$BIN_DIR/zyvo-browser"
     [ -f "$TMP/scripts/zyvo-vision" ]   && install_script "$TMP/scripts/zyvo-vision" "$BIN_DIR/zyvo-vision"
     [ -f "$TMP/scripts/zyvo-uninstall" ] && install_script "$TMP/scripts/zyvo-uninstall" "$BIN_DIR/zyvo-uninstall"
     [ -f "$TMP/scripts/oc-settings.sh" ] && install_script "$TMP/scripts/oc-settings.sh" "$BIN_DIR/oc-settings"
