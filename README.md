@@ -93,7 +93,8 @@ zyvo                 # start the AI — ready to work right away
 zyvo session         # list sessions
 zyvo session proj1   # new/resume session "proj1" — stored in zyvo/proj1/
 zyvo update          # delta update check (0 MB if core is unchanged)
-zyvo preview         # local server + auto-open any page in the browser
+zyvo preview         # local preview + auto-open in browser (http://localhost:8080)
+zyvo share           # instant live Public HTTPS link (share with anyone on phone/PC)
 zyvo uninstall       # cleanly remove ZYVO (keeps your projects)
 oc-settings          # model tier menu
 ```

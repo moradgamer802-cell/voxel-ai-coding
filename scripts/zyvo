@@ -62,24 +62,140 @@ if [ "${1:-}" = "uninstall" ]; then
     exit 1
 fi
 
-# ---- zyvo preview <dir>: local server + open in the default browser ----
-# Browsers block scripts/fetch/CSS on file:// URLs, so HTML opened directly
-# from the file manager often shows a blank page. Serving over http:// fixes it.
-if [ "${1:-}" = "preview" ] || [ "${1:-}" = "open" ]; then
-    PREVIEW_DIR="${2:-$PWD}"
+# ---- zyvo preview / zyvo share: local server + public HTTPS tunnel + auto-open ----
+# Browsers block scripts/fetch/CSS on file:// URLs, so serving over HTTP/HTTPS fixes it.
+# Usage:
+#   zyvo preview [folder]          -> Local server (http://localhost:8080) + auto-open on device
+#   zyvo preview --share [folder]  -> Local server + Instant live Public HTTPS link (Pinggy/LHR)
+#   zyvo share [folder]            -> Same as preview --share
+if [ "${1:-}" = "preview" ] || [ "${1:-}" = "open" ] || [ "${1:-}" = "share" ] || [ "${1:-}" = "public" ]; then
+    CMD_TYPE="$1"
+    shift
+    SHARE_MODE=0
+    if [ "$CMD_TYPE" = "share" ] || [ "$CMD_TYPE" = "public" ]; then
+        SHARE_MODE=1
+    fi
+    PREVIEW_DIR=""
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --share|-s|--public|-p) SHARE_MODE=1; shift ;;
+            --local|-l) SHARE_MODE=0; shift ;;
+            *) [ -z "$PREVIEW_DIR" ] && PREVIEW_DIR="$1"; shift ;;
+        esac
+    done
+    PREVIEW_DIR="${PREVIEW_DIR:-$PWD}"
     [ -d "$PREVIEW_DIR" ] || { echo "zyvo: no such folder: $PREVIEW_DIR" >&2; exit 1; }
     if ! command -v python3 >/dev/null 2>&1; then
-        echo "zyvo: python3 is required for the local server — install it (pkg install python)" >&2
+        echo "zyvo: python3 is required for preview — install it (pkg install python)" >&2
         exit 1
     fi
-    PORT="${ZYVO_PREVIEW_PORT:-8080}"
-    echo "zyvo: serving $PREVIEW_DIR → http://localhost:$PORT"
-    echo "      (opens automatically; Ctrl+C stops the server)"
-    ( sleep 1.5; command -v termux-open-url >/dev/null 2>&1 \
-        && termux-open-url "http://localhost:$PORT/" \
-        || command -v xdg-open >/dev/null 2>&1 && xdg-open "http://localhost:$PORT/" ) &
-    cd "$PREVIEW_DIR" || exit 1
-    exec python3 -m http.server "$PORT" --bind 127.0.0.1
+
+    exec python3 - "$PREVIEW_DIR" "$SHARE_MODE" "$TMPDIR" "${ZYVO_PREVIEW_PORT:-8080}" <<'PYPREV'
+import os, sys, socket, subprocess, time, re
+
+preview_dir = os.path.abspath(sys.argv[1])
+share_mode = (sys.argv[2] == "1")
+tmpdir = sys.argv[3]
+default_port = int(sys.argv[4]) if sys.argv[4].isdigit() else 8080
+
+def is_port_in_use(port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.2)
+        return s.connect_ex(('127.0.0.1', port)) == 0
+
+def find_free_port(start_port):
+    for p in range(start_port, start_port + 20):
+        if not is_port_in_use(p):
+            return p
+    return start_port
+
+def shutil_which(cmd):
+    if cmd.startswith("/") and os.path.isfile(cmd) and os.access(cmd, os.X_OK):
+        return True
+    for path in os.environ.get("PATH", "").split(os.pathsep):
+        exe = os.path.join(path, cmd)
+        if os.path.isfile(exe) and os.access(exe, os.X_OK):
+            return True
+    return False
+
+def open_browser(url):
+    open_cmds = [
+        ["termux-open-url", url],
+        ["am", "start", "-a", "android.intent.action.VIEW", "-d", url],
+        ["/system/bin/am", "start", "-a", "android.intent.action.VIEW", "-d", url],
+        ["termux-open", url],
+        ["xdg-open", url]
+    ]
+    for cmd in open_cmds:
+        if shutil_which(cmd[0]):
+            try:
+                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return True
+            except Exception:
+                pass
+    return False
+
+port = find_free_port(default_port)
+local_url = f"http://localhost:{port}/"
+
+# Start local HTTP server in background
+log_file = os.path.join(tmpdir, f"zyvo-preview-{port}.log")
+log_fh = open(log_file, "w")
+server_proc = subprocess.Popen(
+    [sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1"],
+    cwd=preview_dir,
+    stdout=log_fh,
+    stderr=log_fh,
+    start_new_session=True
+)
+time.sleep(0.3)
+
+public_url = None
+if share_mode and shutil_which("ssh"):
+    tunnel_cmds = [
+        ["ssh", "-p", "443", "-R0:localhost:" + str(port), "-o", "StrictHostKeyChecking=no", "-o", "ServerAliveInterval=30", "a.pinggy.io"],
+        ["ssh", "-R", "80:localhost:" + str(port), "-o", "StrictHostKeyChecking=no", "nokey@localhost.run"]
+    ]
+    for tcmd in tunnel_cmds:
+        try:
+            tproc = subprocess.Popen(
+                tcmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                start_new_session=True
+            )
+            start_t = time.time()
+            while time.time() - start_t < 4.0:
+                line = tproc.stdout.readline()
+                if not line and tproc.poll() is not None:
+                    break
+                m = re.search(r'https://[a-zA-Z0-9\-\.]+\.(?:pinggy\.link|lhr\.life|serveo\.net)[^\s]*', line)
+                if m:
+                    public_url = m.group(0).rstrip('.')
+                    break
+            if public_url:
+                break
+        except Exception:
+            pass
+
+target_url = public_url if public_url else local_url
+open_browser(target_url)
+
+print("\n" + "=" * 50)
+print("  🚀 ZYVO Web Preview Ready!")
+print("=" * 50)
+if public_url:
+    print(f"  🌍 Public Live URL : {public_url}")
+    print(f"     (Share this live HTTPS link with anyone!)")
+print(f"  🏠 Local URL       : {local_url}")
+print(f"  📂 Folder          : {preview_dir}")
+print(f"  📱 Opened automatically in your device browser.")
+print("=" * 50 + "\n")
+
+sys.exit(0)
+PYPREV
 fi
 
 # ---- args: named session (legacy permission flags silently ignored) ----

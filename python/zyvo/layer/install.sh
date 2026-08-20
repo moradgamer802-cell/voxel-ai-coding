@@ -314,8 +314,14 @@ setup_deps() {
         || fatal "missing required tool: curl" "Install curl (or wget) with your package manager, then rerun."
     cmd_exists tar || pm_install tar \
         || fatal "missing required tool: tar" "Install tar with your package manager, then rerun."
-    local WANT="python3 ripgrep unzip git" MISSING="" p
-    for p in $WANT; do cmd_exists "$p" || MISSING="$MISSING $p"; done
+    local WANT="python3 ripgrep unzip git openssh" MISSING="" p
+    for p in $WANT; do
+        if [ "$p" = "openssh" ]; then
+            cmd_exists ssh || MISSING="$MISSING openssh"
+        else
+            cmd_exists "$p" || MISSING="$MISSING $p"
+        fi
+    done
 
     if [ -n "$MISSING" ]; then
         pm_install $MISSING || warn_deps "$MISSING"

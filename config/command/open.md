@@ -1,18 +1,22 @@
 ---
-description: Open a page in the browser (local server) — show the user their website/app visually.
+description: Open a website/app in the browser (local or instant public HTTPS live link).
 agent: build
 ---
 
-The user wants to SEE a page in the browser. $ARGUMENTS
+The user wants to SEE/OPEN a website or web app in the browser. $ARGUMENTS
 
-1. Find the folder that contains the page (index.html) — $ARGUMENTS if given, else look at the project structure
-2. Run this command in the terminal:
-   `zyvo preview <folder>`
-   (it starts a local server at http://localhost:8080 and auto-opens the browser — scripts, CSS and fetch work there, unlike opening the file directly)
+1. Find the project/HTML folder (containing index.html) — from $ARGUMENTS or the project root.
+2. Determine the mode:
+   - **Public link / Share mode** (if $ARGUMENTS contains "share", "public", "link", or user wants to view on other devices):
+     Run: `zyvo preview --share <folder>`
+     (Starts background server + creates an instant live public HTTPS link + auto-opens in browser)
+   - **Local preview mode** (default):
+     Run: `zyvo preview <folder>`
+     (Starts background local server at http://localhost:8080 + auto-opens in browser)
+
 3. Tell the user:
-   - The page is at **http://localhost:8080**
-   - If the browser did not open automatically, they run `zyvo preview <folder>` again
-   - To stop the server: press Ctrl+C in the terminal
-4. If python3 is missing, install it first: `pkg install python`
+   - The clickable link (Local URL / Public HTTPS URL)
+   - The page opened automatically in their phone/device browser
+   - To get a shareable public link anytime: `zyvo preview --share <folder>` (or `/open public`)
 
-Never open HTML files with `termux-open` or a file manager for this purpose — browsers block scripts/CSS on file:// URLs and the page looks broken. Always use `zyvo preview`.
+4. Never open HTML files with `file://` URLs because browsers block scripts and CSS. Always use `zyvo preview`.
