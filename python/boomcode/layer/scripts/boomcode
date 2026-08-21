@@ -1,0 +1,533 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# boomcode — wrapper that disables Android bionic TBI heap pointer tagging
+#
+# The real boomcode binary is boomcode.bin; this script LD_PRELOAD's libtagfix.so
+# (a constructor that calls mallopt to turn off heap tagging) before exec'ing it.
+# Without this, Bun/JSC's NaN-boxing clears the 0xB4 top-byte tag on heap
+# pointers, causing bionic to SIGABRT on free(): "Pointer tag ... was truncated".
+#
+# Permission system: none — everything is allowed by config (beginner CLI
+# design, no prompts). The wrapper does not enforce any permissions.
+#
+# Named sessions: boomcode session <name> — opens <base>/boomcode/<name>/ and
+# resumes the previous chat history with --continue. boomcode session = list.
+#
+# Path resolution order (supports both standalone zip and installed package):
+#   zip:      wrapper, boomcode.bin, libtagfix.so all live in the same dir
+#   installed: bin/boomcode, libexec/opencode/boomcode.bin, lib/libtagfix.so
+#   glibc Linux (Ubuntu proot etc.): ~/.local/bin/boomcode, ~/.local/libexec/boomcode/
+
+set -e
+
+dir="$(cd "$(dirname "$0")" && pwd)"
+export ANDROID_ROOT="${ANDROID_ROOT:-/system}"
+export TERMUX_VERSION="${TERMUX_VERSION:-boomcode-termux}"
+# always have a sane HOME — some launch paths (widgets, menu, shared
+# sessions) start us with an empty environment, and every ~/.config
+# lookup in the TUI's child processes (vision key, yolo state) breaks
+# when HOME is unset
+: "${HOME:=/data/data/com.termux/files/home}"
+export HOME
+export TMPDIR="${BOOMCODE_TMPDIR:-${HOME}/tmp}"
+export TEMP="$TMPDIR"
+export TMP="$TMPDIR"
+export OPENCODE_DISABLE_TUI_AUDIO="${OPENCODE_DISABLE_TUI_AUDIO:-1}"
+mkdir -p "$TMPDIR" 2>/dev/null || true
+
+# ---- boomcode update: reruns the delta installer ----
+# (if the core is unchanged it is 0 MB — only the BOOMCODE layer refreshes)
+if [ "${1:-}" = "update" ] || [ "${1:-}" = "upgrade" ]; then
+    shift
+    echo "boomcode: checking for updates (delta — 0 MB if the core is unchanged)"
+    UPDATER_URL="https://raw.githubusercontent.com/zyvo9/boomcode/main/install.sh"
+    if curl -fsSL --retry 3 --connect-timeout 15 --max-time 120 -o "$TMPDIR/boomcode-update.sh" "$UPDATER_URL" 2>/dev/null; then
+        exec sh "$TMPDIR/boomcode-update.sh" "$@"
+    fi
+    echo "boomcode: could not fetch the update script — check your internet" >&2
+    exit 1
+fi
+
+# ---- boomcode uninstall: removes BOOMCODE cleanly (needs the repo script) ----
+if [ "${1:-}" = "uninstall" ]; then
+    shift
+    UNINSTALLER_URL="https://raw.githubusercontent.com/zyvo9/boomcode/main/scripts/boomcode-uninstall"
+    UNINSTALLER=""
+    # prefer a local copy (installed layout), else the current repo
+    for c in "$dir/../share/boomcode/scripts/boomcode-uninstall" "$dir/boomcode-uninstall" "$TMPDIR/boomcode-uninstall"; do
+        if [ -f "$c" ]; then UNINSTALLER="$c"; break; fi
+    done
+    if [ -z "$UNINSTALLER" ]; then
+        if curl -fsSL --retry 2 --connect-timeout 15 --max-time 60 -o "$TMPDIR/boomcode-uninstall" "$UNINSTALLER_URL" 2>/dev/null; then
+            UNINSTALLER="$TMPDIR/boomcode-uninstall"
+        fi
+    fi
+    if [ -n "$UNINSTALLER" ]; then
+        exec sh "$UNINSTALLER" "$@"
+    fi
+    echo "boomcode: could not fetch the uninstaller — check your internet" >&2
+    exit 1
+fi
+
+# ---- boomcode preview / boomcode share: local server + public HTTPS tunnel + auto-open ----
+# Browsers block scripts/fetch/CSS on file:// URLs, so serving over HTTP/HTTPS fixes it.
+# Usage:
+#   boomcode preview [folder]          -> Local server (http://localhost:8080) + auto-open on device
+#   boomcode preview --share [folder]  -> Local server + Instant live Public HTTPS link (Pinggy/LHR)
+#   boomcode share [folder]            -> Same as preview --share
+if [ "${1:-}" = "preview" ] || [ "${1:-}" = "open" ] || [ "${1:-}" = "share" ] || [ "${1:-}" = "public" ]; then
+    CMD_TYPE="$1"
+    shift
+    SHARE_MODE=1
+    PREVIEW_DIR=""
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --local|-l|--no-share) SHARE_MODE=0; shift ;;
+            --share|-s|--public|-p) SHARE_MODE=1; shift ;;
+            *) [ -z "$PREVIEW_DIR" ] && PREVIEW_DIR="$1"; shift ;;
+        esac
+    done
+    PREVIEW_DIR="${PREVIEW_DIR:-$PWD}"
+    [ -d "$PREVIEW_DIR" ] || { echo "boomcode: no such folder: $PREVIEW_DIR" >&2; exit 1; }
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "boomcode: python3 is required for preview — install it (pkg install python)" >&2
+        exit 1
+    fi
+
+    exec python3 - "$PREVIEW_DIR" "$SHARE_MODE" "$TMPDIR" "${BOOMCODE_PREVIEW_PORT:-8080}" <<'PYPREV'
+import os, sys, socket, subprocess, time, re
+
+preview_dir = os.path.abspath(sys.argv[1])
+share_mode = (sys.argv[2] == "1")
+tmpdir = sys.argv[3]
+default_port = int(sys.argv[4]) if sys.argv[4].isdigit() else 8080
+
+def is_port_in_use(port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.2)
+        return s.connect_ex(('127.0.0.1', port)) == 0
+
+def find_free_port(start_port):
+    for p in range(start_port, start_port + 20):
+        if not is_port_in_use(p):
+            return p
+    return start_port
+
+def shutil_which(cmd):
+    if cmd.startswith("/") and os.path.isfile(cmd) and os.access(cmd, os.X_OK):
+        return True
+    for path in os.environ.get("PATH", "").split(os.pathsep):
+        exe = os.path.join(path, cmd)
+        if os.path.isfile(exe) and os.access(exe, os.X_OK):
+            return True
+    return False
+
+def open_browser(url):
+    open_cmds = [
+        ["termux-open-url", url],
+        ["am", "start", "-a", "android.intent.action.VIEW", "-d", url],
+        ["/system/bin/am", "start", "-a", "android.intent.action.VIEW", "-d", url],
+        ["termux-open", url],
+        ["xdg-open", url]
+    ]
+    for cmd in open_cmds:
+        if shutil_which(cmd[0]):
+            try:
+                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return True
+            except Exception:
+                pass
+    return False
+
+port = find_free_port(default_port)
+local_url = f"http://localhost:{port}/"
+
+# Start local HTTP server in background
+log_file = os.path.join(tmpdir, f"boomcode-preview-{port}.log")
+log_fh = open(log_file, "w")
+server_proc = subprocess.Popen(
+    [sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1"],
+    cwd=preview_dir,
+    stdout=log_fh,
+    stderr=log_fh,
+    start_new_session=True
+)
+time.sleep(0.3)
+
+public_url = None
+if share_mode and shutil_which("ssh"):
+    tunnel_cmds = [
+        ["ssh", "-p", "443", "-R0:localhost:" + str(port), "-o", "StrictHostKeyChecking=no", "-o", "ServerAliveInterval=30", "a.pinggy.io"],
+        ["ssh", "-R", "80:localhost:" + str(port), "-o", "StrictHostKeyChecking=no", "nokey@localhost.run"]
+    ]
+    for tcmd in tunnel_cmds:
+        try:
+            tproc = subprocess.Popen(
+                tcmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                start_new_session=True
+            )
+            start_t = time.time()
+            while time.time() - start_t < 4.0:
+                line = tproc.stdout.readline()
+                if not line and tproc.poll() is not None:
+                    break
+                m = re.search(r'https://[a-zA-Z0-9\-\.]+\.(?:pinggy\.link|lhr\.life|serveo\.net)[^\s]*', line)
+                if m:
+                    public_url = m.group(0).rstrip('.')
+                    break
+            if public_url:
+                break
+        except Exception:
+            pass
+
+target_url = public_url if public_url else local_url
+open_browser(target_url)
+
+print("\n" + "=" * 50)
+print("  🚀 BOOMCODE Web Preview Ready!")
+print("=" * 50)
+if public_url:
+    print(f"  🌍 Public Live URL : {public_url}")
+    print(f"     (Share this live HTTPS link with anyone!)")
+print(f"  🏠 Local URL       : {local_url}")
+print(f"  📂 Folder          : {preview_dir}")
+print(f"  📱 Opened automatically in your device browser.")
+print("=" * 50 + "\n")
+
+sys.exit(0)
+PYPREV
+fi
+
+# ---- workspace and session resolver ----
+# Structure:
+#   /storage/emulated/0/boomcode/
+#   ├── <project1>/    (boomcode <project1> or boomcode session <project1>)
+#   ├── <project2>/    (boomcode <project2>)
+#   └── default/       (boomcode)
+#
+# Every project works strictly inside its own dedicated subfolder
+# so files from different projects never mix or conflict!
+
+WS_BASE=""
+if [ -d /storage/emulated/0 ]; then WS_BASE=/storage/emulated/0
+elif [ -d /sdcard ]; then WS_BASE=/sdcard
+fi
+# ---- old-name migration chain (one-time): zyvo -> blamcode -> boomcode ----
+for old in blamcode zyvo; do
+    if [ -d "$HOME/.config/$old" ] && [ ! -d "$HOME/.config/boomcode" ]; then
+        mv "$HOME/.config/$old" "$HOME/.config/boomcode" 2>/dev/null || true
+    fi
+done
+rm -f "$HOME/.config/opencode/command/zyvo.md"       "$HOME/.config/opencode/command/blam.md" 2>/dev/null || true
+if [ -n "${WS_BASE:-}" ]; then
+    for old in blamcode zyvo; do
+        if [ -d "$WS_BASE/$old" ] && [ ! -d "$WS_BASE/boomcode" ]; then
+            mv "$WS_BASE/$old" "$WS_BASE/boomcode" 2>/dev/null || true
+        fi
+    done
+fi
+
+SDIR_ROOT="${WS_BASE:-$HOME}/boomcode"
+mkdir -p "$SDIR_ROOT" 2>/dev/null || true
+
+SESSION_MODE=0
+SESSION_NAME=""
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --ask)
+            # force ASK mode on for this launch (and persist it)
+            mkdir -p "$HOME/.config/boomcode" 2>/dev/null || true
+            echo on > "$HOME/.config/boomcode/ask.mode" 2>/dev/null || true
+            shift; continue ;;
+        --yolo|-y|--safe)
+            # free/default mode — ASK off (yolo = the usual convention:
+            # no questions, full auto)
+            mkdir -p "$HOME/.config/boomcode" 2>/dev/null || true
+            echo off > "$HOME/.config/boomcode/ask.mode" 2>/dev/null || true
+            shift; continue ;;
+        session|sessions|ls|list)
+            shift
+            if [ "$#" -gt 0 ] && [ "$1" != "ls" ] && [ "$1" != "list" ]; then
+                SESSION_NAME="$1"; shift; SESSION_MODE=1
+            else
+                echo ""
+                echo "📁 BOOMCODE Projects ($SDIR_ROOT):"
+                if [ -d "$SDIR_ROOT" ]; then
+                    count=0
+                    for d in "$SDIR_ROOT"/*; do
+                        if [ -d "$d" ]; then
+                            b="$(basename "$d")"
+                            [ "$b" != ".opencode" ] && echo "  🔹 $b" && count=$((count+1))
+                        fi
+                    done
+                    [ $count -eq 0 ] && echo "  (no project folders yet)"
+                fi
+                echo ""
+                echo "Open or create: boomcode <project-name>"
+                echo "Example:        boomcode coffee-shop"
+                echo ""
+                exit 0
+            fi
+            break ;;
+        -*)
+            # Flag for opencode binary, stop parsing
+            break ;;
+        *)
+            if [ -d "$1" ]; then
+                # User passed an existing path (e.g. boomcode /path/to/folder)
+                cd "$1"
+                export OPENCODE_DEFAULT_DIR="$PWD"
+                shift
+                break
+            else
+                # User passed a project name directly (e.g. boomcode coffee-shop)
+                SESSION_NAME="$1"; shift; SESSION_MODE=1
+                break
+            fi
+            ;;
+    esac
+done
+
+if [ -z "$SESSION_NAME" ]; then
+    case "$PWD" in
+        "$SDIR_ROOT"/*)
+            # Already inside a project subfolder
+            export OPENCODE_DEFAULT_DIR="$PWD"
+            ;;
+        *)
+            if [ "$PWD" = "$HOME" ] || [ "$PWD" = "$SDIR_ROOT" ]; then
+                # Default dedicated folder so root is never cluttered.
+                # Storage may not be granted yet (termux-setup-storage) —
+                # mkdir/cd then fail silently, so guard and fall back to
+                # the internal-storage home instead of dying.
+                SDIR="$SDIR_ROOT/default"
+                if ! mkdir -p "$SDIR" 2>/dev/null || ! cd "$SDIR" 2>/dev/null; then
+                    echo "boomcode: no /sdcard access yet — using ~/boomcode instead" >&2
+                    echo "  (grant storage with:  termux-setup-storage  — /sdcard/boomcode works next run)" >&2
+                    SDIR="$HOME/boomcode/default"
+                    mkdir -p "$SDIR" 2>/dev/null || true
+                    cd "$SDIR" || { echo "boomcode: cannot create $SDIR" >&2; exit 1; }
+                fi
+                export OPENCODE_DEFAULT_DIR="$SDIR"
+            else
+                export OPENCODE_DEFAULT_DIR="$PWD"
+            fi
+            ;;
+    esac
+else
+    case "$SESSION_NAME" in
+        ""|"."|".."|*[!A-Za-z0-9._-]*)
+            echo "boomcode: project names may only contain a-z 0-9 . _ - (no spaces/symbols)" >&2
+            exit 1 ;;
+    esac
+    SDIR="$SDIR_ROOT/$SESSION_NAME"
+    mkdir -p "$SDIR" 2>/dev/null || true
+    if [ -d "$SDIR" ] && cd "$SDIR" 2>/dev/null; then
+        export OPENCODE_DEFAULT_DIR="$SDIR"
+        SESSION_MODE=1
+    elif [ -d "$SDIR" ]; then
+        echo "boomcode: cannot enter $SDIR (storage access?) — run: termux-setup-storage" >&2
+        exit 1
+    else
+        echo "boomcode: could not create project folder ($SDIR)" >&2
+        exit 1
+    fi
+fi
+
+# ---- ask mode: persistent state + live /ask label ------------------------
+# State: ~/.config/boomcode/ask.mode (on|off, default off). On every launch:
+#   1. rewrite the /ask command description so the picker always shows
+#      the actionable label — "/ask off ..." when ON, "/ask on ..." when OFF
+#   2. keep ~/.config/boomcode/ask-instructions.md in sync (ON = strict
+#      ask-before-every-step + stay-on-task instructions, OFF = empty).
+#      It is wired into the global opencode.json "instructions" list
+#      below, so ON applies to every new session.
+#   3. migrate old yolo-mode installs (rename /yolo -> /ask)
+BOOMCODE_CFG="$HOME/.config/boomcode"
+mkdir -p "$BOOMCODE_CFG" 2>/dev/null || true
+if [ ! -f "$BOOMCODE_CFG/ask.mode" ] && [ -f "$BOOMCODE_CFG/yolo.mode" ]; then
+    mv "$BOOMCODE_CFG/yolo.mode" "$BOOMCODE_CFG/ask.mode" 2>/dev/null || true
+fi
+rm -f "$HOME/.config/opencode/command/yolo.md" "$BOOMCODE_CFG/yolo-instructions.md" 2>/dev/null || true
+BOOMCODE_ASK="$(cat "$BOOMCODE_CFG/ask.mode" 2>/dev/null || true)"
+case "$BOOMCODE_ASK" in on|off) ;; *) BOOMCODE_ASK="off" ;; esac
+export BOOMCODE_ASK
+ACMD="$HOME/.config/opencode/command/ask.md"
+if [ -f "$ACMD" ]; then
+    if [ "$BOOMCODE_ASK" = "on" ]; then
+        ADESC="/ask off — ASK ON: AI asks before every step, stays on your task"
+    else
+        ADESC="/ask on — ASK off: AI works freely (no interruptions)"
+    fi
+    sed -i "s|^description:.*|description: $ADESC|" "$ACMD" 2>/dev/null || true
+fi
+if [ "$BOOMCODE_ASK" = "on" ]; then
+    [ -s "$BOOMCODE_CFG/ask-instructions.md" ] || printf 'ASK MODE ON — MANDATORY persistent BOOMCODE instruction.\n1. STAY ON TASK — work ONLY on the user\x27s current request. Never drift to unrelated files, features, or fixes mid-work. Notice something unrelated? List it as an option for LATER — never touch it now.\n2. ASK BEFORE EVERY major step (file edit, tech/framework choice, design decision, fix strategy, project structure): present 2-4 options with a one-line reason each and WAIT for the user to pick. Keep asking at every step — that is the whole point of this mode.\n3. ONE task at a time — finish it or reach a decision point before anything else.\n4. Task DONE -> stop and report. Never start new work on your own.\n5. Unsure what the user wants? ASK — never guess and build.\n' > "$BOOMCODE_CFG/ask-instructions.md" 2>/dev/null || true
+else
+    : > "$BOOMCODE_CFG/ask-instructions.md" 2>/dev/null || true
+fi
+
+# ---- ghost-config self-heal ----
+# Old BOOMCODE versions wrote model ids in a format opencode rejects
+# ("deepseek-v4-flash-free" bare → popup "…/ is not valid"). Those keys
+# can survive in global config, the workspace project dir, or project
+# .opencode/ agent files — strip them on every launch so the picker
+# falls back to the stock default. Fast, silent, safe.
+if command -v python3 >/dev/null 2>&1; then
+    python3 - "$HOME" "${WS_BASE:-$HOME}" >/dev/null 2>&1 <<'PYGC' || true
+import json, os, sys
+home, base = sys.argv[1], sys.argv[2]
+roots = [
+    os.path.join(home, ".config", "opencode"),
+    os.path.join(base, "boomcode"),
+    os.path.join(base, ".opencode"),
+]
+def clean_json(p):
+    try:
+        d = json.load(open(p))
+    except Exception:
+        return
+    if not isinstance(d, dict):
+        return
+    ch = False
+    for k in ("model", "small_model"):
+        if k in d:
+            del d[k]; ch = True
+    a = d.get("agent")
+    if isinstance(a, dict) and isinstance(a.get("build"), dict) and "model" in a["build"]:
+        del a["build"]["model"]; ch = True
+    if ch:
+        try:
+            json.dump(d, open(p, "w"), indent=2)
+        except Exception:
+            pass
+def clean_md(p):
+    try:
+        lines = open(p).readlines()
+    except Exception:
+        return
+    out = [l for l in lines if not l.startswith("model:")]
+    if len(out) != len(lines):
+        try:
+            open(p, "w").writelines(out)
+        except Exception:
+            pass
+for root in roots:
+    if not os.path.isdir(root):
+        continue
+    # stale /model command files are removed — the built-in /models picker
+    # is the only model command that should exist
+    cdir = os.path.join(root, "command")
+    if os.path.isdir(cdir):
+        for fn in ("model.md", "model.json", "model.jsonc"):
+            p = os.path.join(cdir, fn)
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames
+                       if d not in ("node_modules", ".git", "skills", "themes")]
+        if dirpath.count(os.sep) - root.count(os.sep) > 3:
+            dirnames[:] = []
+            continue
+        for fn in filenames:
+            p = os.path.join(dirpath, fn)
+            if fn in ("opencode.json", "opencode.jsonc"):
+                clean_json(p)
+            elif fn == "config.json" and ".opencode" in dirpath:
+                clean_json(p)
+            elif fn.endswith(".md") and (".opencode" in dirpath or
+                    dirpath.endswith(os.sep + "agent") or dirpath.endswith("/agent")):
+                clean_md(p)
+
+# wire the persistent ask-mode instructions into the global config
+# (idempotent — opencode appends every "instructions" file to the system
+# prompt, so ASK ON applies to all sessions; the file is empty when OFF)
+try:
+    gp = os.path.join(home, ".config", "opencode", "opencode.json")
+    try:
+        d = json.load(open(gp))
+    except Exception:
+        d = {}
+    if not isinstance(d, dict):
+        d = {}
+    ains = os.path.join(home, ".config", "boomcode", "ask-instructions.md")
+    ins = d.get("instructions")
+    if isinstance(ins, str):
+        ins = [ins]
+    elif not isinstance(ins, list):
+        ins = []
+    if ains not in ins:
+        ins.append(ains)
+        d["instructions"] = ins
+        json.dump(d, open(gp, "w"), indent=2)
+except Exception:
+    pass
+PYGC
+fi
+
+# Set the terminal title so the toolbar shows BOOMCODE
+if ( : >/dev/tty ) 2>/dev/null; then printf '\033]0;BOOMCODE\007' >/dev/tty 2>/dev/null; fi
+
+# Locate the native libraries we ship alongside the wrapper.
+# In the flat layout they sit next to the wrapper; in the Termux package
+# layout they are under ../lib; on glibc Linux under ~/.local/lib/boomcode.
+NATIVE_LIB_DIR=""
+for candidate in \
+    "$dir/../lib" \
+    "${PREFIX:-/data/data/com.termux/files/usr}/lib" \
+    "$HOME/.local/lib/boomcode" \
+    "$dir"
+do
+    if [ -f "$candidate/libtagfix.so" ]; then
+        NATIVE_LIB_DIR="$candidate"
+        break
+    fi
+done
+
+if [ -n "$NATIVE_LIB_DIR" ]; then
+    export LD_PRELOAD="${NATIVE_LIB_DIR}/libtagfix.so${LD_PRELOAD:+:$LD_PRELOAD}"
+    export LD_LIBRARY_PATH="${NATIVE_LIB_DIR}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    export OPENTUI_LIB_PATH="${NATIVE_LIB_DIR}/libopentui.so"
+    if [ -f "${NATIVE_LIB_DIR}/librust_pty_arm64.so" ]; then
+        export BUN_PTY_LIB="${NATIVE_LIB_DIR}/librust_pty_arm64.so"
+    fi
+    export OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER="${OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER:-true}"
+    if [ -x "$NATIVE_LIB_DIR/bun" ]; then
+        export OPENCODE_BUN_PATH="$NATIVE_LIB_DIR/bun"
+    fi
+elif [ -n "$PREFIX" ] && [ -d "$PREFIX" ]; then
+    # warn only on real Termux — glibc Linux does not need the native lib
+    echo "boomcode: warning: native library directory not found, may crash on Android 11+" >&2
+fi
+
+# Locate the real binary. Prefer the package layout first so upgrades do not
+# accidentally execute a stale flat-layout binary left in $PREFIX/bin.
+BIN=""
+for candidate in \
+    "$dir/../libexec/opencode/opencode.bin" \
+    "$HOME/.local/libexec/boomcode/opencode.bin" \
+    "${PREFIX:-/data/data/com.termux/files/usr}/libexec/opencode/opencode.bin" \
+    "$dir/opencode.bin" \
+    "$HOME/.opencode/bin/opencode"
+do
+    if [ -x "$candidate" ]; then
+        BIN="$candidate"
+        break
+    fi
+done
+[ -n "$BIN" ] || { echo "boomcode: error: could not find opencode.bin" >&2; exit 127; }
+
+rc=0
+if [ "$SESSION_MODE" = 1 ]; then
+    "$BIN" --continue "$@" || rc=$?
+else
+    "$BIN" "$@" || rc=$?
+fi
+exit $rc

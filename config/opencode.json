@@ -1,0 +1,53 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "theme": "boomcode",
+  "username": "boomcode-dev",
+  "provider": {
+    "boomcode": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "OpenCode (Zen)",
+      "options": {
+        "baseURL": "https://opencode.ai/zen/v1",
+        "apiKey": "{env:OPENCODE_API_KEY}"
+      }
+    }
+  },
+  "default_agent": "build",
+  "agent": {
+    "build": {
+      "temperature": 0.5,
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "webfetch": "allow",
+        "websearch": "allow",
+        "external_directory": "allow",
+        "doom_loop": "allow"
+      }
+    }
+  },
+  "snapshot": false,
+  "autoupdate": false,
+  "share": "disabled",
+  "watcher": {
+    "ignore": [
+      "Android/**",
+      "DCIM/**",
+      "Pictures/**",
+      "Movies/**",
+      "Music/**",
+      "WhatsApp/**",
+      "Download/**",
+      "**/node_modules/**",
+      "**/.git/**"
+    ]
+  },
+  "permission": {
+    "bash": "allow",
+    "edit": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "external_directory": "allow",
+    "doom_loop": "allow"
+  }
+}

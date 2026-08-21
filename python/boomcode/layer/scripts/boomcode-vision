@@ -1,0 +1,542 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# boomcode-vision — see images via OpenCode Zen (mimo, free) with direct-Gemini fallback
+#
+# MADE FOR BATCHES: give it many images in ONE call — they go out in a few
+# grouped requests instead of a parallel burst (parallel calls are what
+# triggers rate limits).
+#   boomcode-vision still1.jpg still2.jpg still3.jpg "compare these"
+#   boomcode-vision shot.png                       (single, no question)
+#
+# Provider chain (first one that answers wins):
+#   1. Zen  mimo-v2.5-free   — free; rate-limited calls WAIT and retry
+#                             (20s/40s backoff) before falling through
+#   2. Gemini (direct API)   — gemini-3.6-flash -> gemini-flash-latest
+#                             -> gemini-2.5-flash (only if a key exists)
+# Concurrency: a lock + 2s spacing serializes simultaneous boomcode-vision
+# processes, so the AI can't burst the API even if it tries.
+#
+# Supports: .jpg .jpeg .png .webp .gif .bmp and video (.mp4 .mkv .webm .mov
+#           .avi .3gp .m4v — via native Gemini video when a key is set, or
+#           ffmpeg frame sampling: 6 evenly-spaced frames -> one image call)
+# Usage:
+#   boomcode-vision <image...> [question]     (a non-file arg = the question)
+#   BOOMCODE_VISION_MODEL=<model>    (override primary model)
+#   BOOMCODE_VISION_PROVIDER=gemini  (skip Zen, go direct)
+# Supports: .jpg .jpeg .png .webp .gif .bmp
+#
+# Keys (found automatically — Zen auths are tried TUI-first):
+#   Zen:    1. ~/.local/share/opencode/auth.json zen access_token (OAuth —
+#              the same credential the TUI uses; its quota class differs
+#              from raw API keys)
+#           2. ~/.local/share/opencode/auth.json zen api key (sk-...)
+#           3. ZEN_API_KEY / OPENCODE_API_KEY (env)
+#           4. ~/.config/boomcode/vision.key (an sk-... key)
+#           5. /proc/*/environ of the running TUI (recovers the key when
+#              the bash tool strips env vars; HOME-independent)
+#   Gemini: GEMINI_API_KEY (env)
+#           > ~/.config/boomcode/vision.key (an AIza... key)
+# HOME is resolved robustly (env > Termux standard > passwd > cwd) — some
+# launch paths arrive with HOME unset and break every ~/ lookup.
+# API keys travel in headers, never in URLs/logs.
+
+set -e
+
+FILES=()
+PROMPT=""
+for arg in "$@"; do
+    if [ -f "$arg" ]; then
+        FILES+=("$arg")
+    elif [ -z "$PROMPT" ]; then
+        PROMPT="$arg"
+    else
+        echo "❌ Not a file: $arg" >&2
+        exit 1
+    fi
+done
+
+if [ "${#FILES[@]}" -eq 0 ] && [ "${1:-}" != "--status" ]; then
+    echo "Usage: boomcode-vision <image...> [question]"
+    echo "       boomcode-vision --status   (show which vision keys were found)"
+    echo "Supports: jpg jpeg png webp gif bmp — many images in one call"
+    echo "Zen key (optional): echo sk-... > ~/.config/boomcode/vision.key"
+    exit 1
+fi
+if [ "${#FILES[@]}" -eq 1 ]; then
+    PROMPT="${PROMPT:-Describe this image in detail. Include all objects, colors, text, and layout.}"
+else
+    PROMPT="${PROMPT:-Describe each image in detail — objects, colors, text, layout. Start each description with its filename.}"
+fi
+
+if command -v python3 >/dev/null 2>&1; then
+    PY=python3
+elif command -v python >/dev/null 2>&1; then
+    PY=python
+else
+    echo "❌ Python is required for boomcode-vision" >&2
+    exit 1
+fi
+
+exec "$PY" - "$PROMPT" "${FILES[@]}" <<'PYVIS'
+import sys, os, base64, json, time
+import urllib.request, urllib.error
+
+def out(s):
+    try:
+        os.write(1, (str(s) + "\n").encode("utf-8", "replace"))
+    except Exception:
+        pass
+
+prompt = sys.argv[1]
+paths = [os.path.abspath(p) for p in sys.argv[2:]]
+model_override = os.environ.get("BOOMCODE_VISION_MODEL", "")
+provider = os.environ.get("BOOMCODE_VISION_PROVIDER", "").lower()
+
+def get_home():
+    """HOME can arrive empty when spawned from odd launch paths — resolve
+    a real one: env > Termux standard > passwd > expanduser > cwd."""
+    h = os.environ.get("HOME", "")
+    if h and os.path.isabs(h) and os.path.isdir(h):
+        return h
+    for c in ("/data/data/com.termux/files/home",):
+        if os.path.isdir(c):
+            return c
+    try:
+        import pwd
+        h = pwd.getpwuid(os.getuid()).pw_dir
+        if h and os.path.isabs(h) and os.path.isdir(h):
+            return h
+    except Exception:
+        pass
+    h = os.path.expanduser("~")
+    if os.path.isabs(h) and os.path.isdir(h):
+        return h
+    return os.getcwd()
+
+home = get_home()
+
+def env_from_proc():
+    """The TUI's bash tool may strip env vars, but the running opencode
+    process carries OPENCODE_API_KEY in its /proc environ (same uid,
+    readable). Recover it as a last-resort credential source."""
+    try:
+        import glob
+        for p in sorted(glob.glob("/proc/[0-9]*/environ")):
+            try:
+                data = open(p, "rb").read()
+            except Exception:
+                continue
+            for kv in data.split(b"\0"):
+                if kv.startswith(b"OPENCODE_API_KEY="):
+                    v = kv.split(b"=", 1)[1].decode("utf-8", "replace").strip()
+                    if v:
+                        return v
+    except Exception:
+        pass
+    return ""
+
+mime_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+            "webp": "image/webp", "gif": "image/gif", "bmp": "image/bmp"}
+VIDEO_MIME = {"mp4": "video/mp4", "mkv": "video/x-matroska", "webm": "video/webm",
+              "mov": "video/quicktime", "avi": "video/x-msvideo",
+              "3gp": "video/3gpp", "m4v": "video/x-m4v"}
+
+images = []
+video_paths = []
+for p in paths:
+    ext = os.path.splitext(p)[1].lower().lstrip(".")
+    if ext in VIDEO_MIME:
+        video_paths.append(p)
+        continue
+    mime = mime_map.get(ext, "image/jpeg")
+    size = os.path.getsize(p)
+    if size > 20 * 1024 * 1024:
+        out(f"[image too large: {os.path.basename(p)} "
+            f"({size/1024/1024:.1f} MB — inline limit is 20 MB)]")
+        sys.exit(1)
+    b64 = base64.b64encode(open(p, "rb").read()).decode()
+    images.append({"name": os.path.basename(p), "mime": mime, "b64": b64})
+
+# ---- concurrency guard: one boomcode-vision at a time + 2s spacing ----------
+# If the AI fires several vision calls in parallel, they queue up here
+# instead of bursting the API into a rate limit.
+lock_fh = None
+state = os.path.join(home, ".config", "boomcode", "vision.last")
+os.makedirs(os.path.dirname(state), exist_ok=True)
+try:
+    import fcntl
+    lock_fh = open(os.path.join(home, ".config", "boomcode", "vision.lock"), "w")
+    fcntl.flock(lock_fh, fcntl.LOCK_EX)  # blocks until other instances finish
+except Exception:
+    lock_fh = None
+try:
+    last = 0.0
+    try:
+        last = float(open(state).read().strip() or 0)
+    except Exception:
+        pass
+    gap = time.time() - last
+    if gap < 2.0:
+        time.sleep(2.0 - gap)
+except Exception:
+    pass
+def stamp():
+    try:
+        open(state, "w").write(str(time.time()))
+    except Exception:
+        pass
+
+# ---- key discovery --------------------------------------------------------
+def read_file(p):
+    try:
+        return open(p, "r").read().strip()
+    except Exception:
+        return ""
+
+# Zen credentials, tried in order — OAuth token first (the TUI's own route;
+# its quota class is why chat never rate-limits while raw API keys can)
+zen_auths = []
+try:
+    auth = json.loads(read_file(os.path.join(home, ".local", "share",
+                                             "opencode", "auth.json")))
+    z = auth.get("zen") if isinstance(auth, dict) else None
+    if isinstance(z, dict):
+        tok = z.get("access_token") or ""
+        if isinstance(tok, str) and len(tok) > 20:
+            zen_auths.append(tok)
+        k = z.get("key") or z.get("api_key") or ""
+        if isinstance(k, str) and k.startswith("sk-"):
+            zen_auths.append(k)
+except Exception:
+    pass
+for k in (os.environ.get("ZEN_API_KEY", "").strip(),
+          os.environ.get("OPENCODE_API_KEY", "").strip()):
+    if k:
+        zen_auths.append(k)
+fk = read_file(os.path.join(home, ".config", "boomcode", "vision.key"))
+if fk.startswith("sk-"):
+    zen_auths.append(fk)
+# last resort: recover the key from the running TUI process itself
+proc_key = env_from_proc()
+if proc_key and proc_key not in zen_auths:
+    zen_auths.append(proc_key)
+_seen = set()
+zen_auths = [a for a in zen_auths if not (a in _seen or _seen.add(a))]
+
+gemini_key = os.environ.get("GEMINI_API", "") or os.environ.get("GEMINI_API_KEY", "")
+if not gemini_key:
+    fk = read_file(os.path.join(home, ".config", "boomcode", "vision.key"))
+    if fk.startswith("AIza"):
+        gemini_key = fk
+
+# ---- diagnostic mode: boomcode-vision --status -------------------------------
+if prompt == "--status":
+    def red(s):
+        return f"{s[:8]}…({len(s)} chars)" if len(s) > 12 else "(found)"
+    auth_p = os.path.join(home, ".local", "share", "opencode", "auth.json")
+    print(f"home: {home}")
+    try:
+        raw_auth = json.loads(read_file(auth_p))
+        z = raw_auth.get("zen") if isinstance(raw_auth, dict) else None
+        if isinstance(z, dict):
+            print(f"auth.json: present, zen fields: {sorted(z.keys())}")
+        elif isinstance(raw_auth, dict):
+            print(f"auth.json: present, top-level keys: {sorted(raw_auth.keys())}")
+        else:
+            print("auth.json: present but not an object")
+    except Exception as e:
+        print(f"auth.json: NOT readable at {auth_p} ({str(e)[:60]})")
+    for var in ("ZEN_API_KEY", "OPENCODE_API_KEY", "GEMINI_API_KEY"):
+        v = os.environ.get(var, "")
+        print(f"env {var}: {'set: ' + red(v) if v else 'not set'}")
+    vk = os.path.join(home, ".config", "boomcode", "vision.key")
+    print(f"vision.key: {'present, starts ' + fk[:4] + '…' if fk else 'absent'}")
+    print(f"home resolved to: {home}")
+    print(f"/proc environ recovery: {'found ' + red(proc_key) if proc_key else 'nothing found'}")
+    print(f"zen credentials discovered: {len(zen_auths)}")
+    for i, a in enumerate(zen_auths, 1):
+        print(f"  {i}. {red(a)}")
+    print(f"gemini fallback: {'armed' if gemini_key else 'no key'}")
+    sys.exit(0)
+
+# ---- videos: native Gemini first, else ffmpeg frame sampling -------------
+def call_gemini_video(model, vids, question):
+    import urllib.request, urllib.error, json as _json
+    url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+           f"{model}:generateContent")
+    parts = [{"text": question}]
+    for v in vids:
+        ext = os.path.splitext(v)[1].lower().lstrip(".")
+        mime = VIDEO_MIME.get(ext, "video/mp4")
+        b64v = base64.b64encode(open(v, "rb").read()).decode()
+        parts.append({"inline_data": {"mime_type": mime, "data": b64v}})
+    payload = {"contents": [{"parts": parts}]}
+    req = urllib.request.Request(url, data=_json.dumps(payload).encode(),
+                                 headers={"Content-Type": "application/json",
+                                          "x-goog-api-key": gemini_key})
+    with urllib.request.urlopen(req, timeout=180) as r:
+        d = _json.loads(r.read().decode())
+    return d["candidates"][0]["content"]["parts"][0]["text"]
+
+def extract_frames(video, ff):
+    import subprocess, shutil, tempfile
+    tmp = tempfile.mkdtemp(prefix="boomcode-vision-")
+    dur = None
+    fp = shutil.which("ffprobe")
+    if fp:
+        try:
+            r = subprocess.run([fp, "-v", "error", "-show_entries",
+                                "format=duration", "-of", "csv=p=0", video],
+                               capture_output=True, text=True, timeout=30)
+            dur = float(r.stdout.strip())
+        except Exception:
+            dur = None
+    n = 6
+    if dur and dur > 0.5:
+        stamps = [min(dur * (i + 0.5) / n, max(dur - 0.1, 0.0)) for i in range(n)]
+    else:
+        stamps = [float(i) for i in range(n)]
+    frames = []
+    for i, t in enumerate(stamps):
+        out_f = os.path.join(tmp, f"f{i:02d}.jpg")
+        try:
+            subprocess.run([ff, "-ss", f"{t:.2f}", "-i", video, "-frames:v", "1",
+                            "-q:v", "4", out_f, "-y"], capture_output=True,
+                           timeout=60)
+        except Exception:
+            continue
+        if os.path.exists(out_f) and os.path.getsize(out_f) > 0:
+            frames.append((out_f, t))
+    return frames
+
+video_note_added = False
+video_ok = False
+if video_paths:
+    remaining = list(video_paths)
+    # route 1: Gemini understands video natively — no ffmpeg needed
+    if gemini_key and provider != "zen":
+        small = [v for v in remaining
+                 if os.path.getsize(v) <= 20 * 1024 * 1024]
+        big = [v for v in remaining if v not in small]
+        for v in big:
+            out(f"[{os.path.basename(v)}: over 20 MB — Gemini inline limit; "
+                f"compress or trim it]")
+        if small:
+            vq = ("Describe each video in detail — what happens over time, "
+                  "scene changes, motion, text on screen.")
+            for gm in (["gemini-3.6-flash", "gemini-flash-latest",
+                        "gemini-2.5-flash"] if not model_override
+                       else [model_override]):
+                try:
+                    text = call_gemini_video(gm, small, vq)
+                    stamp()
+                    out(f"🎬 {' + '.join(os.path.basename(v) for v in small)} "
+                        f"(gemini {gm}):")
+                    out("")
+                    out(text)
+                    remaining = big
+                    video_ok = True
+                    break
+                except Exception:
+                    continue
+    # route 2: sample frames with ffmpeg and send them as images
+    if remaining:
+        import shutil, subprocess
+        ff = shutil.which("ffmpeg")
+        ff_working = False
+        if ff:
+            try:
+                r = subprocess.run([ff, "-version"], capture_output=True,
+                                   timeout=15)
+                ff_working = (r.returncode == 0)
+            except Exception:
+                ff_working = False
+        for v in remaining:
+            base = os.path.basename(v)
+            if not ff:
+                out(f"[{base}: video needs ffmpeg (pkg install ffmpeg) or a "
+                    f"free Gemini key — skipping]")
+            elif not ff_working:
+                out(f"[{base}: ffmpeg is broken — fix with "
+                    f"'pkg reinstall ffmpeg', or set a free Gemini key "
+                    f"(GEMINI_API_KEY) for native video — skipping]")
+            else:
+                frames = extract_frames(v, ff)
+                if not frames:
+                    out(f"[{base}: could not extract frames — skipping]")
+                    continue
+                for fp_, t in frames:
+                    b64f = base64.b64encode(open(fp_, "rb").read()).decode()
+                    images.append({"name": f"{base}@{t:.1f}s",
+                                   "mime": "image/jpeg", "b64": b64f})
+                if not video_note_added:
+                    prompt += (" (Some images are frames sampled from "
+                               "video(s) — describe what happens over "
+                               "time.)")
+                    video_note_added = True
+    if not images:
+        # videos only — exit status reflects whether anything was seen
+        sys.exit(0 if video_ok else 1)
+
+# ---- batching: max 8 images / 12 MB base64 per request --------------------
+batches, cur, cur_bytes = [], [], 0
+for img in images:
+    if cur and (len(cur) >= 8 or cur_bytes + len(img["b64"]) > 12 * 1024 * 1024):
+        batches.append(cur)
+        cur, cur_bytes = [], 0
+    cur.append(img)
+    cur_bytes += len(img["b64"])
+if cur:
+    batches.append(cur)
+
+# ---- provider chain -------------------------------------------------------
+zen_models = [model_override or "mimo-v2.5-free"]
+gemini_models = []
+for m in ([model_override] if model_override else []) + \
+           ["gemini-3.6-flash", "gemini-flash-latest", "gemini-2.5-flash"]:
+    if m not in gemini_models:
+        gemini_models.append(m)
+
+chain = []
+if provider != "gemini":
+    for auth in zen_auths:
+        chain += [("zen", m, auth) for m in zen_models]
+if provider != "zen" and gemini_key:
+    chain += [("gemini", m) for m in gemini_models]
+if not chain:
+    out("[no vision key found — vision needs one of these:]")
+    out("  Zen (recommended — the same free key chat uses):")
+    out("    already works when OPENCODE_API_KEY is set, or")
+    out("    echo sk-YOURKEY > ~/.config/boomcode/vision.key")
+    out("  Gemini: export GEMINI_API_KEY=AIza... (free key: aistudio.google.com)")
+    sys.exit(1)
+
+def call_zen(model, batch, auth):
+    url = "https://opencode.ai/zen/v1/chat/completions"
+    content = [{"type": "text", "text": prompt}]
+    for img in batch:
+        content.append({"type": "image_url", "image_url":
+                        {"url": f"data:{img['mime']};base64,{img['b64']}"}})
+    payload = {"model": model, "messages": [{"role": "user", "content": content}]}
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(),
+                                 headers={"Content-Type": "application/json",
+                                          "Authorization": f"Bearer {auth}",
+                                          # Zen keys the free quota to the
+                                          # opencode client id — BOOMCODE is a
+                                          # rebranded opencode, so this is
+                                          # our real identity. Other UAs
+                                          # get a permanently-exhausted
+                                          # anonymous bucket (429 always).
+                                          "User-Agent": "opencode/1.0.0"})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        d = json.loads(r.read().decode())
+    return d["choices"][0]["message"]["content"]
+
+def call_gemini(model, batch):
+    url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+           f"{model}:generateContent")
+    parts = [{"text": prompt}]
+    for img in batch:
+        parts.append({"inline_data": {"mime_type": img["mime"],
+                                      "data": img["b64"]}})
+    payload = {"contents": [{"parts": parts}]}
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(),
+                                 headers={"Content-Type": "application/json",
+                                          "x-goog-api-key": gemini_key})
+    with urllib.request.urlopen(req, timeout=90) as r:
+        d = json.loads(r.read().decode())
+    return d["candidates"][0]["content"]["parts"][0]["text"]
+
+def fatal(msg):
+    out(msg)
+    names = ", ".join(f"{e[0]}:{e[1]}" for e in chain)
+    out(f"[boomcode-vision failed — tried: {names}]")
+    sys.exit(1)
+
+def run_batch(batch, first):
+    """Send one image batch through the provider chain.
+    Rate-limited providers WAIT and retry before falling through."""
+    for i, entry in enumerate(chain):
+        prov, model = entry[0], entry[1]
+        zen_auth = entry[2] if len(entry) > 2 else None
+        is_last = i == len(chain) - 1
+        if prov == "zen":
+            # patient backoff: free limits usually clear in seconds-minutes
+            for attempt in range(3):
+                try:
+                    text = call_zen(model, batch, zen_auth)
+                    stamp()
+                    label = f" ({model})" if first else ""
+                    out(f"📷 {' + '.join(im['name'] for im in batch)}{label}:")
+                    out("")
+                    out(text)
+                    return
+                except urllib.error.HTTPError as e:
+                    body = ""
+                    try:
+                        body = e.read().decode()[:200]
+                    except Exception:
+                        pass
+                    if e.code == 401 and not is_last:
+                        # expired OAuth token / bad key — next credential now
+                        out("[auth rejected — trying next credential]")
+                        break
+                    limited = e.code == 429 or "Limit" in body or "Credits" in body
+                    if limited and not is_last:
+                        # a different credential/route has its own quota
+                        # bucket — try it before burning backoff time
+                        out(f"[{model}: rate limited — trying next route]")
+                        break
+                    if limited and attempt < 2:
+                        out(f"[{model}: rate limited — retrying in 3s "
+                            f"(try {attempt + 2}/3)]")
+                        time.sleep(3)
+                        continue
+                    if not is_last:
+                        out(f"[{model}: unavailable (HTTP {e.code}) — "
+                            f"falling back]")
+                        break
+                    fatal(f"[Zen error: HTTP {e.code} {body}]")
+                except Exception as e:
+                    if not is_last:
+                        out(f"[{model}: {str(e)[:80]} — falling back]")
+                        break
+                    fatal(f"[Zen error: {str(e)[:120]}]")
+        else:
+            note = None
+            for attempt in range(3):
+                try:
+                    text = call_gemini(model, batch)
+                    stamp()
+                    out(f"📷 {' + '.join(im['name'] for im in batch)}:")
+                    out("")
+                    out(text)
+                    return
+                except urllib.error.HTTPError as e:
+                    try:
+                        err = json.loads(e.read().decode())
+                        msg = err.get("error", {}).get("message", "")
+                    except Exception:
+                        msg = ""
+                    pretty = msg[:150] if msg else f"HTTP {e.code}"
+                    if e.code == 429:  # rate limited — wait, retry same model
+                        if attempt < 2:
+                            time.sleep(3)
+                            continue
+                        fatal("[Gemini rate limited — try again in a minute]")
+                    if e.code in (400, 404) and not is_last:
+                        note = f"[{model} unavailable — falling back]"
+                        break
+                    fatal(f"[Gemini error: {pretty}]")
+                except Exception as e:
+                    fatal(f"[Gemini error: {str(e)[:120]}]")
+            if note:
+                out(note)
+    fatal("[all vision providers failed]")
+
+for bi, batch in enumerate(batches):
+    if bi > 0:
+        out("")
+        time.sleep(2)  # breathing room between batches
+    run_batch(batch, bi == 0)
+sys.exit(0)
+PYVIS

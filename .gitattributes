@@ -1,0 +1,6 @@
+*.sh text eol=lf
+scripts/boomcode text eol=lf
+scripts/boomcode-menu text eol=lf
+scripts/boomcode-vision text eol=lf
+scripts/boomcode-browser text eol=lf
+install.sh text eol=lf

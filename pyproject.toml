@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "boomcode"
+version = "0.5.7"
+description = "BOOMCODE — AI coding CLI for Termux. Your app, BLAM, done!"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "zyvo9" }]
+keywords = ["ai", "cli", "terminal", "termux", "coding-agent", "android"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development",
+]
+dependencies = []
+
+[project.scripts]
+boomcode = "boomcode.cli:main"
+
+[tool.setuptools]
+packages = ["boomcode"]
+
+[tool.setuptools.package-dir]
+boomcode = "python/boomcode"
+
+[tool.setuptools.package-data]
+boomcode = ["layer/**/*"]

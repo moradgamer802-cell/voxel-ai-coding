@@ -1,0 +1,140 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# boomcode-menu — optional branded launcher for BOOMCODE on Termux.
+#
+# Safe way to start BOOMCODE: every option below exec's the real boomcode wrapper
+# (which sets LD_PRELOAD=libtagfix.so + all env). If boomcode is not on PATH,
+# paper over it with a direct opencode.bin launch using the same env chain.
+#
+# Note: /models, /theme and /auto are TUI-internal commands — they can't be
+# run from a shell. The menu prints the exact keys to press inside the TUI.
+
+set -e
+
+PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+
+find_boomcode() {
+    for c in \
+        "$PREFIX/bin/boomcode" \
+        "$PREFIX/libexec/opencode/boomcode.bin" \
+        "$PREFIX/libexec/opencode/opencode.bin" \
+        "$HOME/.local/bin/boomcode" \
+        "$HOME/.local/libexec/boomcode/opencode.bin" \
+        "$HOME/.opencode/bin/opencode"
+    do
+        [ -x "$c" ] && { echo "$c"; return 0; }
+    done
+    return 1
+}
+
+launch() { # run the real wrapper with args ($1 = bin, rest = args)
+    bin="$1"; shift
+    if [ "$(basename "$bin")" = "boomcode" ]; then
+        exec "$bin" "$@"
+    else
+        # raw binary: replicate the wrapper env chain
+        export ANDROID_ROOT="${ANDROID_ROOT:-/system}"
+        export OPENCODE_DISABLE_TUI_AUDIO="${OPENCODE_DISABLE_TUI_AUDIO:-1}"
+        export TMPDIR="${BOOMCODE_TMPDIR:-${HOME:-/data/data/com.termux/files/home}/tmp}"
+        mkdir -p "$TMPDIR" 2>/dev/null || true
+        for libdir in "$PREFIX/lib" "$HOME/.local/lib/boomcode"; do
+            if [ -f "$libdir/libtagfix.so" ]; then
+                export LD_PRELOAD="$libdir/libtagfix.so${LD_PRELOAD:+:$LD_PRELOAD}"
+                export LD_LIBRARY_PATH="$libdir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+                [ -f "$libdir/libopentui.so" ]      && export OPENTUI_LIB_PATH="$libdir/libopentui.so"
+                [ -f "$libdir/librust_pty_arm64.so" ] && export BUN_PTY_LIB="$libdir/librust_pty_arm64.so"
+                [ -x "$libdir/bun" ]                && export OPENCODE_BUN_PATH="$libdir/bun"
+                export OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER="${OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER:-true}"
+                break
+            fi
+        done
+        exec "$bin" "$@"
+    fi
+}
+
+BIN="$(find_boomcode || true)"
+
+menu() {
+    printf '\033[1;96m=== BOOMCODE launcher ===\033[0m\n'
+    printf '  1) Chat (new session)\n'
+    printf '  2) Open project       boomcode <name>\n'
+    printf '  3) List projects       boomcode ls\n'
+    printf '  4) Keys help\n'
+    printf '  5) Version\n'
+    printf '  6) Update BOOMCODE\n'
+    printf '  7) Headless server (serve)\n'
+    printf '  8) Plugins\n'
+    printf '  9) Trust a folder\n'
+    printf '  0) Exit\n'
+    printf 'Choose [0-9]: '
+}
+
+while :; do
+    menu
+    read -r choice
+    case "$choice" in
+        1)
+            [ -n "$BIN" ] || { echo "boomcode not found — run install.sh first" >&2; exit 1; }
+            launch "$BIN"
+            ;;
+        2)
+            printf 'Project name: '
+            read -r pname
+            [ -n "$BIN" ] || { echo "boomcode not found" >&2; exit 1; }
+            launch "$BIN" "$pname"
+            ;;
+        3)
+            [ -n "$BIN" ] || { echo "boomcode not found" >&2; exit 1; }
+            SDIR_ROOT=""
+            if [ -d /storage/emulated/0 ]; then SDIR_ROOT=/storage/emulated/0/boomcode
+            elif [ -d /sdcard ]; then SDIR_ROOT=/sdcard/boomcode
+            else SDIR_ROOT="$HOME/boomcode"
+            fi
+            echo ""
+            echo "📁 BOOMCODE Projects ($SDIR_ROOT):"
+            if [ -d "$SDIR_ROOT" ]; then
+                count=0
+                for d in "$SDIR_ROOT"/*; do
+                    if [ -d "$d" ]; then
+                        b="$(basename "$d")"
+                        [ "$b" != ".opencode" ] && echo "  🔹 $b" && count=$((count+1))
+                    fi
+                done
+                [ $count -eq 0 ] && echo "  (no project folders yet)"
+            else
+                echo "  (no boomcode folder yet)"
+            fi
+            echo ""
+            echo "Open or create: boomcode <project-name>"
+            echo ""
+            read -r _ || true
+            ;;
+        4)
+            printf '\nInside the BOOMCODE TUI:\n  Ctrl+K  -> command palette (/models, /theme...)\n  Esc    -> back\n  /explore /fix /review /ask /boomcode /open -> in-chat commands\nPress any key to return to menu...\n'
+            read -r _
+            ;;
+        5)
+            if [ -n "$BIN" ]; then launch "$BIN" --version; else echo "boomcode not installed"; fi
+            read -r _ || true
+            ;;
+        6)
+            echo "Run: sh $PREFIX/../share/boomcode/install.sh   (or re-download the installer)"
+            read -r _ || true
+            ;;
+        7)
+            [ -n "$BIN" ] || { echo "boomcode not found" >&2; exit 1; }
+            launch "$BIN" serve 2>/dev/null || launch "$BIN" serve --port 4020
+            ;;
+        8)
+            [ -n "$BIN" ] || { echo "boomcode not found" >&2; exit 1; }
+            launch "$BIN" plugin
+            ;;
+        9)
+            printf 'Folder to trust: '
+            read -r folder
+            [ -n "$BIN" ] || { echo "boomcode not found" >&2; exit 1; }
+            launch "$BIN" trust include "$folder"
+            ;;
+        0) exit 0 ;;
+        *) ;;
+    esac
+done

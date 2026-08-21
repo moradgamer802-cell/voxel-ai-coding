@@ -1,0 +1,122 @@
+"""boomcode — command-line bootstrap for installing BOOMCODE from PyPI.
+
+`pip install boomcode` gives you the `boomcode` command. Running it
+installs the BOOMCODE layer (scripts + config + skills + installer) from
+the wheel's own bundled copy — no network fetch for the layer — then hands
+over to the real installer, which downloads the core engine with a single
+live progress line. On Termux the installer later replaces the bootstrap
+with the full `boomcode` wrapper at the same path, so the name never
+changes for the user.
+
+Design: the pip package bundles the layer and acts as the launcher;
+all real logic lives in install.sh, so curl-install and pip-install
+behave identically (pip just skips the layer download).
+"""
+
+import argparse
+import os
+import shutil
+import subprocess
+import sys
+
+from . import __version__
+
+# bundled layer lives inside the installed package (setuptools package-data)
+_LAYER_SRC = os.path.join(os.path.dirname(__file__), "layer")
+BOOT_DIR = os.path.join(os.path.expanduser("~"), ".local", "boomcode", "boot")
+
+
+def _extract_layer(dest):
+    """Copy the bundled layer into dest (keeps file modes via copytree)."""
+    os.makedirs(dest, exist_ok=True)
+    for entry in os.listdir(_LAYER_SRC):
+        src = os.path.join(_LAYER_SRC, entry)
+        shutil.copy2(src, dest, follow_symlinks=True) if os.path.isfile(src) else shutil.copytree(
+            src, os.path.join(dest, entry), dirs_exist_ok=True
+        )
+
+
+def _jump_to_installer(boot):
+    """Run the real installer with the boot layer as the layer source."""
+    installer = os.path.join(boot, "install.sh")
+    if not os.path.isfile(installer):
+        sys.exit(
+            "error: boot layer is incomplete (missing install.sh);\n"
+            "       rerun:  boomcode install"
+        )
+    if not os.access(installer, os.X_OK):
+        os.chmod(installer, 0o755)
+    # prefer bash when available (install.sh animates; POSIX sh works too)
+    shell = "bash" if shutil.which("bash") else "sh"
+    env = dict(os.environ, BOOMCODE_BOOT=boot)
+    print("\nboomcode: layer ready — starting the core installer…\n")
+    sys.exit(subprocess.call([shell, installer], env=env))
+
+
+def _configure_rc():
+    """Make sure the shell rc points at the boot scripts dir."""
+    rc = os.path.join(os.path.expanduser("~"), ".bashrc")
+    if not os.path.exists(rc):
+        return
+    with open(rc, "r", encoding="utf-8", errors="ignore") as f:
+        content = f.read()
+    marker = "# BOOMCODE PATH"
+    if marker in content:
+        return
+    boot_bin = os.path.join(BOOT_DIR, "scripts")
+    with open(rc, "a", encoding="utf-8") as f:
+        f.write('\n# BOOMCODE PATH\ncase ":$PATH:" in *":{}:"*) ;; *) export PATH="{}:$PATH";; esac\n'.format(
+            boot_bin, boot_bin
+        ))
+    print("boomcode: added BOOMCODE PATH to {}".format(rc))
+
+
+def cmd_install(args):
+    # always refresh: a stale boot layer (older install.sh) must never
+    # survive an upgrade — wipe and re-extract every run (180KB, instant)
+    if os.path.isfile(os.path.join(BOOT_DIR, "install.sh")):
+        print("boomcode: refreshing layer ({} → {})".format("old", __version__))
+    shutil.rmtree(BOOT_DIR, ignore_errors=True)
+    print("boomcode: writing layer to {}".format(BOOT_DIR))
+    _extract_layer(BOOT_DIR)
+    _configure_rc()
+    _jump_to_installer(BOOT_DIR)
+    return 0
+
+
+def cmd_uninstall(args):
+    if os.path.isdir(BOOT_DIR):
+        shutil.rmtree(BOOT_DIR)
+        print("boomcode: removed layer {}".format(BOOT_DIR))
+    else:
+        print("boomcode: no layer found at {}".format(BOOT_DIR))
+    print("boomcode: done — your projects and files were left untouched")
+    return 0
+
+
+def cmd_version(args):
+    print("boomcode-bootstrap {}".format(__version__))
+    return 0
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        prog="boomcode",
+        description="Install BOOMCODE (AI coding CLI for Termux).",
+    )
+    sub = parser.add_subparsers(dest="command")
+    sub.add_parser("install", help="install the BOOMCODE layer + core engine")
+    sub.add_parser("uninstall", help="remove the downloaded layer only")
+    sub.add_parser("version", help="print the bootstrap version")
+    args = parser.parse_args(argv)
+
+    if args.command == "uninstall":
+        return cmd_uninstall(args)
+    if args.command == "version":
+        return cmd_version(args)
+    # default (no command, or "install") → full install
+    return cmd_install(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,71 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# boomcode-uninstall — cleanly removes BOOMCODE from the device
+#
+# Usage:
+#   boomcode uninstall          (asks for confirmation)
+#   boomcode uninstall -y       (skip confirmation)
+#
+# Removes:
+#   - the boomcode / oc-settings / boomcode-menu launchers
+#   - the BOOMCODE layer (config, skills, commands) at ~/.config/opencode
+#   - the branded core binary at libexec + native libs
+#   - PATH + OPENCODE_API_KEY lines from ~/.bashrc
+#
+# Keeps (never touched):
+#   - your projects / session folders (/storage/emulated/0/boomcode)
+#   - the opencode core install at ~/.opencode (separate tool)
+set -e
+
+PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+HOME_DIR="${HOME:-/data/data/com.termux/files/home}"
+CONFIG_DIR="$HOME/.config/opencode"
+BIN_DIR=""
+LIBEXEC_DIR=""
+LIB_DIR=""
+
+# resolve install layout (Termux vs ~/.local)
+if [ -n "$PREFIX" ] && [ -d "$PREFIX" ] && [ -n "$(command -v pkg 2>/dev/null || true)" ]; then
+    BIN_DIR="$PREFIX/bin"
+    LIBEXEC_DIR="$PREFIX/libexec/opencode"
+    LIB_DIR="$PREFIX/lib"
+else
+    BIN_DIR="$HOME/.local/bin"
+    LIBEXEC_DIR="$HOME/.local/libexec/boomcode"
+    LIB_DIR="$HOME/.local/lib/boomcode"
+fi
+
+if [ "${1:-}" != "-y" ] && [ "${1:-}" != "--yes" ]; then
+    echo "This will remove BOOMCODE (AI coding CLI) from this device."
+    echo "  launchers:  $BIN_DIR/{boomcode,boomcode-menu,oc-settings}"
+    echo "  config:     $CONFIG_DIR  (opencode.json, agent, commands, skills)"
+    echo "  core:       $LIBEXEC_DIR + $LIB_DIR"
+    echo
+    echo "Your projects and session folders are NOT touched."
+    echo -n "Continue? [y/N]: "
+    read -r CONFIRM || CONFIRM=""
+    case "$CONFIRM" in
+        y|Y|yes|YES) ;;
+        *) echo "Aborted."; exit 1;;
+    esac
+fi
+
+rm -f "$BIN_DIR/boomcode" "$BIN_DIR/boomcode-menu" "$BIN_DIR/oc-settings"
+rm -f "$LIBEXEC_DIR/opencode.bin" "$LIBEXEC_DIR/boomcode-core-version"
+rm -rf "$LIBEXEC_DIR" "$LIB_DIR"
+rm -rf "$CONFIG_DIR"
+echo "  ✓ launchers removed"
+echo "  ✓ config layer removed ($CONFIG_DIR)"
+echo "  ✓ core removed"
+
+# clean ~/.bashrc additions (only the BOOMCODE lines)
+RC="$HOME_DIR/.bashrc"
+[ -f "$RC" ] || RC="$HOME_DIR/.profile"
+if [ -f "$RC" ]; then
+    grep -v "BOOMCODE AI\|BOOMCODE PATH\|OPENCODE_API_KEY=" "$RC" > "$RC.boomcode-clean" 2>/dev/null || true
+    mv "$RC.boomcode-clean" "$RC"
+    echo "  ✓ PATH + API key lines removed from $(basename "$RC")"
+fi
+
+echo
+echo "BOOMCODE uninstalled. Your projects are still at /storage/emulated/0/boomcode."
+echo "Reinstall any time with:  curl -fsSL https://raw.githubusercontent.com/zyvo9/boomcode/main/install.sh | bash"
