@@ -27,51 +27,69 @@ The scrub engine (`references/scrub-engine.js`) is lightweight vanilla JS with z
 
 ## 🎯 Primary Workflow: Prompt Handover & Video Drop (Default — Zero-Config)
 
-This is the default, 100% mobile-friendly workflow:
+This is the default, 100% mobile-friendly workflow.
+
+> 🗣️ **Beginner voice — mandatory on this whole workflow.** The user may never have
+> used an AI video tool before, so at every step:
+> - Explain in **the user's own language, plain words** — no jargon without a one-line
+>   translation ("prompt = AI-কে দেওয়া লিখিত নির্দেশনা / the written instruction you
+>   paste into the video tool").
+> - **One action per message** — say exactly what to do NOW, where the file is, and
+>   what "done" looks like. Never dump five steps and leave.
+> - Every prompt ships as a **text file sitting exactly where its result belongs**:
+>   `assets/image1.txt` next to where `scene1.png` goes, `videos/video1.txt` next to
+>   where `video1.mp4` goes, `videos/connector1.txt` next to `conn1.mp4`. One folder
+>   opened = instruction + result side by side; nothing to memorise.
+> - ALSO show the prompt text itself in chat (copyable) — never make the user hunt
+>   through files to see what they're pasting.
+> - Tell them WHERE things go: images + their `.txt` prompts → `assets/`,
+>   videos/connectors + their `.txt` prompts + upload frames → `videos/`.
 
 ### Step 1: Concept & Website Base Setup
 1. Ask the user for the **Topic / Business**, **Brand Name**, and **Number of Scenes** (2, 3, 4, or 6 scenes).
 2. Immediately generate the complete frontend website:
    - `index.html` + `style.css` + copy `references/scrub-engine.js`.
    - Setup the section titles, subtitles, tags, accent colors, and CTA buttons.
-   - Create a `videos/` folder in the project.
+   - Create `assets/` and `videos/` folders in the project.
 
 ### Step 2: Phase A — Dive Videos (each seeded with its OWN scene still)
-Generate **one dive prompt per scene** formatted for web AI video tools (**Kling AI, Luma Dream Machine, Runway Gen-3, Minimax Hailuo, Pika**) and present them in chat as a spec table. The seeding rule is what keeps every clip on-topic and the world cohesive:
+Generate **one image prompt per scene** and **one dive video prompt per scene**, formatted for web AI video tools (**Kling AI, Luma Dream Machine, Runway Gen-3, Minimax Hailuo, Pika**). Write every prompt as a file NEXT TO where its result goes — image prompts to `assets/image1.txt`, `image2.txt`, … ; video prompts to `videos/video1.txt`, `video2.txt`, … — then show the short spec table in chat. The seeding rule is what keeps every clip on-topic and the world cohesive:
 
-> ⚠️ **Two hard rules — state them to the user every time:**
+> ⚠️ **Two hard rules — state them to the user every time, in their words:**
 > - ❌ **Never generate a section video text-only.** Each video MUST start from its own scene image (uploaded as the start / first frame). Text-only clips are unrelated worlds and the seams can never match.
 > - ❌ **Never chain a main video from the previous main video's last frame.** That is how the camera drifts off-topic by scene 2–3. Chaining belongs ONLY to the short connectors in Phase B.
 > - ✅ Every dive starts from ITS OWN still → on-topic, and all scenes share one world.
 
-Present as a table (never prose):
+Present as a table (never prose) — each row's Prompt column IS its `.txt` file:
 
-| Video | Start frame (upload) | Prompt | Save as |
+| What you make | Upload with it | Prompt file | Save result as |
 |---|---|---|---|
-| Dive 1 | `scene1.png` | "Begin high above <scene 1 subject>… descend inside…" | `videos/video1.mp4` |
-| Dive 2 | `scene2.png` | "Begin high above <scene 2 subject>…" | `videos/video2.mp4` |
-| … | … | … | … |
+| Scene images | — | `assets/image1.txt` … | `assets/scene1.png` … |
+| Dive videos | that scene's image | `videos/video1.txt` … | `videos/video1.mp4` … |
 
 Add one line of tool-specific how-to: **Kling → Image-to-Video (first frame)**, **Luma → keyframe start**, **Runway → first/last frame input**, Hailuo/Pika → image-to-video if available.
 
-Tell the user:
-> *"Website ready! Render the N dive videos above — upload each scene's image as the start frame, save the `.mp4` into `videos/` (`video1.mp4`, `video2.mp4`, …), and reply 'done'."*
+Tell the user (plain words):
+> *"প্রথমে ৩টা ছবি বানান — `assets/image1.txt` ফাইল খুলে টেক্সটটা কপি করে আপনার image tool-এ পেস্ট করুন। ছবিটা সেই ফোল্ডারেই রাখুন (`assets/scene1.png`)। তারপর প্রতিটা ভিডিওর জন্য `videos/video1.txt`-এর টেক্সট + ওই scene-এর ছবিটা একসাথে আপনার video tool-এ দিন (ছবিটা 'start frame' হিসেবে)। ভিডিওও ওই `videos/` ফোল্ডারেই রাখুন। হয়ে গেলে 'done' লিখুন।"*
+> *(Translate/adapt to whatever language the user speaks — same structure: open the txt next to where the result goes → copy text → paste in tool → add the image → save result in the same folder → reply done.)*
 
 ### Step 3: Phase B — Connectors (the clips that make it ONE world)
 When the dives land, build **N−1 short connector clips** (5 s) so the sections flow without cuts. A connector's two endpoints are pinned to ACTUAL rendered frames — that's why it can't drift:
 
-1. Extract boundary frames from the RENDERED dives (not the stills). If `ffmpeg` exists run it yourself:
+1. Extract boundary frames from the RENDERED dives (not the stills), saved INTO `videos/`. If `ffmpeg` exists run it yourself:
    ```bash
-   ffmpeg -sseof -0.15 -i videos/video1.mp4 -frames:v 1 -q:v 2 last1.png    # dive 1 interior
-   ffmpeg -ss 0      -i videos/video2.mp4 -frames:v 1 -q:v 2 first2.png    # dive 2 establishing
+   ffmpeg -sseof -0.15 -i videos/video1.mp4 -frames:v 1 -q:v 2 videos/last1.png    # dive 1 interior
+   ffmpeg -ss 0      -i videos/video2.mp4 -frames:v 1 -q:v 2 videos/first2.png     # dive 2 establishing
    ```
-   No ffmpeg on device? Tell the user to grab the last frame of `video_i` and the first frame of `video_{i+1}` from their video player/tool and drop them in the project.
-2. Present the connector spec table:
+   No ffmpeg on device? Tell the user to grab the last frame of `video_i` and the first frame of `video_{i+1}` from their video player/tool and drop them into `videos/`.
+2. Write each connector prompt NEXT TO its result — `videos/connector1.txt`, `connector2.txt`, … — and present the spec table:
 
-   | Connector | Start frame (upload) | End frame (upload) | Prompt | Save as |
+   | Connector | Start frame (upload) | End frame (upload) | Prompt file | Save result as |
    |---|---|---|---|---|
-   | conn1 | `last1.png` | `first2.png` | "Camera pulls up out of <scene 1>, glides across the connected world, descends toward <scene 2>…" (5 s) | `videos/conn1.mp4` |
-   | conn2 | `last2.png` | `first3.png` | … | `videos/conn2.mp4` |
+   | conn1 | `videos/last1.png` | `videos/first2.png` | `videos/connector1.txt` (5 s) | `videos/conn1.mp4` |
+   | conn2 | `videos/last2.png` | `videos/first3.png` | `videos/connector2.txt` | `videos/conn2.mp4` |
+
+   Explain WHY in one beginner line: *"এই ছোট ক্লিপগুলোর শুরু আর শেষ দুই মাথাই আসল ছবি দিয়ে আটকানো — তাই এগুলো কখনো গল্প থেকে সরে যাবে না; এগুলোই আলাদা ভিডিওগুলোকে এক টানা যাত্রা বানায়।"*
 
 3. State the fallback up front: **if the user's tool has no end-frame slot, don't force it** — say you'll wire those connectors as `null` and the engine crossfades those seams directly. The page still completes.
 

@@ -196,23 +196,28 @@ seedance: `--mode std --resolution 1080p --aspect_ratio 16:9 --duration 5`; klin
 ## Web-tool handoff tables (Primary Workflow — SKILL.md Steps 2–3)
 
 On the zero-config path every render request is delivered as a **spec table**, never
-prose — the table is the contract for what you're still waiting on. Two tables per build:
+prose — the table is the contract for what you're still waiting on. Two tables per
+build. **File convention: every prompt lives as a `.txt` sitting exactly where its
+result belongs** (`assets/image1.txt` → `assets/scene1.png`, `videos/video1.txt` →
+`videos/video1.mp4`, `videos/connector1.txt` → `videos/conn1.mp4`; upload frames also
+go in `videos/`). Also paste each prompt's text in chat so nothing needs hunting.
 
 **Phase A — dives** (one row per scene; start frame is that scene's OWN still):
 
-| Video | Start frame (upload) | Prompt | Save as | Status |
+| What you make | Upload with it | Prompt file | Save result as | Status |
 |---|---|---|---|---|
-| Dive 1 | `scene1.png` | dive prompt for scene 1 | `videos/video1.mp4` | pending |
-| Dive 2 | `scene2.png` | dive prompt for scene 2 | `videos/video2.mp4` | pending |
+| Scene images | — | `assets/image1.txt` … | `assets/scene1.png` … | pending |
+| Dive 1 | `assets/scene1.png` | `videos/video1.txt` | `videos/video1.mp4` | pending |
+| Dive 2 | `assets/scene2.png` | `videos/video2.txt` | `videos/video2.mp4` | pending |
 
 Keep the Status column current (pending / rendered / accepted) as files arrive.
 
 **Phase B — connectors** (one row per gap; BOTH endpoints are frames extracted from the
 rendered dives — never the stills):
 
-| Connector | Start frame | End frame | Prompt | Save as | Status |
+| Connector | Start frame | End frame | Prompt file | Save result as | Status |
 |---|---|---|---|---|---|
-| conn1 | `last1.png` (dive 1 last) | `first2.png` (dive 2 first) | connector prompt, 5 s | `videos/conn1.mp4` | pending |
+| conn1 | `videos/last1.png` (dive 1 last) | `videos/first2.png` (dive 2 first) | `videos/connector1.txt`, 5 s | `videos/conn1.mp4` | pending |
 
 Acceptance rule to state with Phase B: the start frame must be obeyed exactly; the end
 frame only needs to land on the same composition (the engine crossfade covers a
