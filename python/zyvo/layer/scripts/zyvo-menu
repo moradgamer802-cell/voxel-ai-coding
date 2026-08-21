@@ -36,10 +36,17 @@ launch() { # run the real wrapper with args ($1 = bin, rest = args)
         export OPENCODE_DISABLE_TUI_AUDIO="${OPENCODE_DISABLE_TUI_AUDIO:-1}"
         export TMPDIR="${ZYVO_TMPDIR:-${HOME:-/data/data/com.termux/files/home}/tmp}"
         mkdir -p "$TMPDIR" 2>/dev/null || true
-        if [ -f "$PREFIX/lib/libtagfix.so" ]; then
-            export LD_PRELOAD="$PREFIX/lib/libtagfix.so${LD_PRELOAD:+:$LD_PRELOAD}"
-            export LD_LIBRARY_PATH="$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-        fi
+        for libdir in "$PREFIX/lib" "$HOME/.local/lib/zyvo"; do
+            if [ -f "$libdir/libtagfix.so" ]; then
+                export LD_PRELOAD="$libdir/libtagfix.so${LD_PRELOAD:+:$LD_PRELOAD}"
+                export LD_LIBRARY_PATH="$libdir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+                [ -f "$libdir/libopentui.so" ]      && export OPENTUI_LIB_PATH="$libdir/libopentui.so"
+                [ -f "$libdir/librust_pty_arm64.so" ] && export BUN_PTY_LIB="$libdir/librust_pty_arm64.so"
+                [ -x "$libdir/bun" ]                && export OPENCODE_BUN_PATH="$libdir/bun"
+                export OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER="${OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER:-true}"
+                break
+            fi
+        done
         exec "$bin" "$@"
     fi
 }

@@ -1,10 +1,12 @@
 """zyvo — command-line bootstrap for installing ZYVO from PyPI.
 
-`pip install zyvo` gives you the `zyvo` command. Running it installs
-the ZYVO layer (scripts + config + skills + installer) from the wheel's
-own bundled copy — no network fetch for the layer — then hands over to
-the real installer, which downloads the core engine with a single live
-progress line.
+`pip install zyvo` gives you the `zyvo-boot` command (the name is
+deliberately NOT `zyvo`: on Termux pip writes scripts to $PREFIX/bin,
+where the real installer also puts its `zyvo` wrapper — an alias would
+collide with it). Running it installs the ZYVO layer (scripts + config +
+skills + installer) from the wheel's own bundled copy — no network fetch
+for the layer — then hands over to the real installer, which downloads
+the core engine with a single live progress line.
 
 Design: the pip package bundles the layer and acts as the launcher;
 all real logic lives in install.sh, so curl-install and pip-install
@@ -40,7 +42,7 @@ def _jump_to_installer(boot):
     if not os.path.isfile(installer):
         sys.exit(
             "error: boot layer is incomplete (missing install.sh);\n"
-            "       rerun:  zyvo install"
+            "       rerun:  zyvo-boot install"
         )
     if not os.access(installer, os.X_OK):
         os.chmod(installer, 0o755)

@@ -59,7 +59,7 @@ pick_model() {
     local prev="$1"
     local TIER_ARG="${2:-}"
     case "$TIER_ARG" in
-        max|flash|default|full) MODEL="deepseek-v4-flash-free"; SMALL="laguna-s-2.1-free"; return;;
+        max|flash|fast|default|full) MODEL="deepseek-v4-flash-free"; SMALL="laguna-s-2.1-free"; return;;
         lightning) MODEL="nemotron-3.5-lightning-free"; SMALL="laguna-s-2.1-free"; return;;
         mid|medium) MODEL="mimo-v2.5-free"; SMALL="laguna-s-2.1-free"; return;;
         ultra|strong) MODEL="nemotron-3-ultra-free"; SMALL="laguna-s-2.1-free"; return;;

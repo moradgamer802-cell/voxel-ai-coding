@@ -331,7 +331,7 @@ setup_deps() {
     bump 10
 }
 warn_deps() {
-    printf "\r\033[K  ${C_Y}!${C_N} could not auto-install:$1 — continuing with what exists\n"
+    printf "\r\033[K  ${C_Y}!${C_N} could not auto-install:%s — continuing with what exists\n" "$1"
     STATUS="dependencies partial"
 }
 
