@@ -280,27 +280,31 @@ if [ "$(id -u 2>/dev/null)" != "0" ] && [ "$ENV_KIND" != "termux" ] && cmd_exist
     SUDO="sudo"
 fi
 
-pm_install() { # <packages...>
+pm_install() { # <packages...> — runs the package manager LIVE on screen.
+    # The user watches the real pkg/apt/npm-style progress instead of a
+    # silent spinner, so long installs never feel frozen. Every branch is
+    # wrapped in `if` so a failing PM just falls through to the next one
+    # (set -e must not kill the installer on a failed branch).
     [ $# -gt 0 ] || return 0
-    local label="installing deps"
     if [ "$ENV_KIND" = "termux" ] && cmd_exists pkg; then
-        run_bg "$label (pkg)"     pkg install -y "$@" && return 0
+        status "installing deps (pkg): $*"
+        if pkg install -y "$@"; then return 0; fi
     fi
-    if cmd_exists apt-get;  then run_bg "$label (apt)"     $SUDO apt-get install -y "$@"        && return 0; fi
-    if cmd_exists dnf;      then run_bg "$label (dnf)"     $SUDO dnf install -y "$@"            && return 0; fi
-    if cmd_exists yum;      then run_bg "$label (yum)"     $SUDO yum install -y "$@"            && return 0; fi
-    if cmd_exists zypper;   then run_bg "$label (zypper)"  $SUDO zypper --non-interactive install "$@" && return 0; fi
-    if cmd_exists pacman;   then run_bg "$label (pacman)"  $SUDO pacman -Sy --noconfirm "$@"    && return 0; fi
-    if cmd_exists apk;      then run_bg "$label (apk)"     $SUDO apk add --no-cache "$@"        && return 0; fi
-    if cmd_exists xbps-install; then run_bg "$label (xbps)" $SUDO xbps-install -Sy "$@"         && return 0; fi
-    if cmd_exists emerge;   then run_bg "$label (emerge)"  $SUDO emerge -q "$@"                 && return 0; fi
-    if cmd_exists opkg;     then run_bg "$label (opkg)"    $SUDO opkg install "$@"              && return 0; fi
-    if cmd_exists brew;     then run_bg "$label (brew)"    brew install "$@"                    && return 0; fi
-    if cmd_exists port;     then run_bg "$label (port)"    $SUDO port -N install "$@"           && return 0; fi
-    if cmd_exists pkg_add;  then run_bg "$label (pkg_add)" $SUDO pkg_add "$@"                   && return 0; fi
-    if cmd_exists pacapt;   then run_bg "$label (pacapt)"  $SUDO pacapt -S --noconfirm "$@"     && return 0; fi
-    if cmd_exists choco;    then run_bg "$label (choco)"   choco install -y "$@"                && return 0; fi
-    if cmd_exists winget;   then run_bg "$label (winget)"  winget install --silent "$@"         && return 0; fi
+    if cmd_exists apt-get;  then status "installing deps (apt): $*";     if $SUDO apt-get install -y "$@"; then return 0; fi; fi
+    if cmd_exists dnf;      then status "installing deps (dnf): $*";     if $SUDO dnf install -y "$@"; then return 0; fi; fi
+    if cmd_exists yum;      then status "installing deps (yum): $*";     if $SUDO yum install -y "$@"; then return 0; fi; fi
+    if cmd_exists zypper;   then status "installing deps (zypper): $*";  if $SUDO zypper --non-interactive install "$@"; then return 0; fi; fi
+    if cmd_exists pacman;   then status "installing deps (pacman): $*";  if $SUDO pacman -Sy --noconfirm "$@"; then return 0; fi; fi
+    if cmd_exists apk;      then status "installing deps (apk): $*";     if $SUDO apk add --no-cache "$@"; then return 0; fi; fi
+    if cmd_exists xbps-install; then status "installing deps (xbps): $*"; if $SUDO xbps-install -Sy "$@"; then return 0; fi; fi
+    if cmd_exists emerge;   then status "installing deps (emerge): $*";  if $SUDO emerge -q "$@"; then return 0; fi; fi
+    if cmd_exists opkg;     then status "installing deps (opkg): $*";    if $SUDO opkg install "$@"; then return 0; fi; fi
+    if cmd_exists brew;     then status "installing deps (brew): $*";    if brew install "$@"; then return 0; fi; fi
+    if cmd_exists port;     then status "installing deps (port): $*";    if $SUDO port -N install "$@"; then return 0; fi; fi
+    if cmd_exists pkg_add;  then status "installing deps (pkg_add): $*"; if $SUDO pkg_add "$@"; then return 0; fi; fi
+    if cmd_exists pacapt;   then status "installing deps (pacapt): $*";  if $SUDO pacapt -S --noconfirm "$@"; then return 0; fi; fi
+    if cmd_exists choco;    then status "installing deps (choco): $*";   if choco install -y "$@"; then return 0; fi; fi
+    if cmd_exists winget;   then status "installing deps (winget): $*";  if winget install --silent "$@"; then return 0; fi; fi
     return 1
 }
 
@@ -331,7 +335,7 @@ setup_deps() {
     bump 10
 }
 warn_deps() {
-    printf "\r\033[K  ${C_Y}!${C_N} could not auto-install:$1 — continuing with what exists\n"
+    printf "\r\033[K  ${C_Y}!${C_N} could not auto-install:%s — continuing with what exists\n" "$1"
     STATUS="dependencies partial"
 }
 
@@ -378,8 +382,10 @@ setup_core_npm() { # architecture-neutral fallback (32-bit ARM, x86, odd ROMs)
     fi
 
     mkdir -p "$BIN_DIR" "$STAMP_DIR" "$LIB_DIR"
-    run_bg "installing core (npm)" npm install -g opencode-ai \
-        || fatal "npm core install failed" "Check your internet, then rerun."
+    status "installing core (npm) — live output:"
+    if ! npm install -g opencode-ai; then
+        fatal "npm core install failed" "Check your internet, then rerun."
+    fi
 
     local target="" c nroot nprefix
     nroot="$(npm root -g 2>/dev/null)"
@@ -487,7 +493,8 @@ setup_core() {
             bump 70
             return
         fi
-        if ! run_bg "installing official core" bash -c \
+        status "installing official core — live output:"
+        if ! bash -c \
             "curl -fsSL --retry 3 --connect-timeout 15 --max-time 120 -o '$TMP/oc-install.sh' '$OPENCODE_INSTALL_URL' && bash '$TMP/oc-install.sh'"; then
             printf "\r\033[K  ${C_Y}!${C_N} official core installer failed — using the Node build\n"
             setup_core_npm
