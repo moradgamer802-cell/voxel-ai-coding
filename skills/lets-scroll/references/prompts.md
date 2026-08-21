@@ -192,3 +192,29 @@ seedance: `--mode std --resolution 1080p --aspect_ratio 16:9 --duration 5`; klin
   the payoff + it carries the CTA.
 - `body` — one sentence, plain-spoken, from the visitor's side.
 - `tags` — 0–3 short proof chips (e.g. "Fresh-cooked", "30-min delivery").
+
+## Web-tool handoff tables (Primary Workflow — SKILL.md Steps 2–3)
+
+On the zero-config path every render request is delivered as a **spec table**, never
+prose — the table is the contract for what you're still waiting on. Two tables per build:
+
+**Phase A — dives** (one row per scene; start frame is that scene's OWN still):
+
+| Video | Start frame (upload) | Prompt | Save as | Status |
+|---|---|---|---|---|
+| Dive 1 | `scene1.png` | dive prompt for scene 1 | `videos/video1.mp4` | pending |
+| Dive 2 | `scene2.png` | dive prompt for scene 2 | `videos/video2.mp4` | pending |
+
+Keep the Status column current (pending / rendered / accepted) as files arrive.
+
+**Phase B — connectors** (one row per gap; BOTH endpoints are frames extracted from the
+rendered dives — never the stills):
+
+| Connector | Start frame | End frame | Prompt | Save as | Status |
+|---|---|---|---|---|---|
+| conn1 | `last1.png` (dive 1 last) | `first2.png` (dive 2 first) | connector prompt, 5 s | `videos/conn1.mp4` | pending |
+
+Acceptance rule to state with Phase B: the start frame must be obeyed exactly; the end
+frame only needs to land on the same composition (the engine crossfade covers a
+Seedance-style near-miss). Tool has no end-frame slot → wire that connector as `null`
+(engine crossfades the seam directly) and say so.

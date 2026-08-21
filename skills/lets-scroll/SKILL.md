@@ -36,20 +36,50 @@ This is the default, 100% mobile-friendly workflow:
    - Setup the section titles, subtitles, tags, accent colors, and CTA buttons.
    - Create a `videos/` folder in the project.
 
-### Step 2: Deliver AI Video Prompts in Chat
-Generate 2–4 tailored, ultra-cinematic prompts formatted for web AI video tools (**Kling AI, Luma Dream Machine, Runway Gen-3, Minimax Hailuo, Pika**) and present them directly in the chat for the user to copy:
-- **Scene 1 Prompt:** Establish the world & opening camera glide.
-- **Scene 2 Prompt:** Interior / process camera dive.
-- **Scene 3/Finale Prompt:** Hero product / destination close-up.
+### Step 2: Phase A — Dive Videos (each seeded with its OWN scene still)
+Generate **one dive prompt per scene** formatted for web AI video tools (**Kling AI, Luma Dream Machine, Runway Gen-3, Minimax Hailuo, Pika**) and present them in chat as a spec table. The seeding rule is what keeps every clip on-topic and the world cohesive:
+
+> ⚠️ **Two hard rules — state them to the user every time:**
+> - ❌ **Never generate a section video text-only.** Each video MUST start from its own scene image (uploaded as the start / first frame). Text-only clips are unrelated worlds and the seams can never match.
+> - ❌ **Never chain a main video from the previous main video's last frame.** That is how the camera drifts off-topic by scene 2–3. Chaining belongs ONLY to the short connectors in Phase B.
+> - ✅ Every dive starts from ITS OWN still → on-topic, and all scenes share one world.
+
+Present as a table (never prose):
+
+| Video | Start frame (upload) | Prompt | Save as |
+|---|---|---|---|
+| Dive 1 | `scene1.png` | "Begin high above <scene 1 subject>… descend inside…" | `videos/video1.mp4` |
+| Dive 2 | `scene2.png` | "Begin high above <scene 2 subject>…" | `videos/video2.mp4` |
+| … | … | … | … |
+
+Add one line of tool-specific how-to: **Kling → Image-to-Video (first frame)**, **Luma → keyframe start**, **Runway → first/last frame input**, Hailuo/Pika → image-to-video if available.
 
 Tell the user:
-> *"I've set up the website layout! Copy these prompts into your preferred AI video generator (Kling / Luma / Runway), save the resulting `.mp4` clips into the `videos/` folder (e.g. `video1.mp4`, `video2.mp4`), and reply 'done'."*
+> *"Website ready! Render the N dive videos above — upload each scene's image as the start frame, save the `.mp4` into `videos/` (`video1.mp4`, `video2.mp4`, …), and reply 'done'."*
 
-### Step 3: Video Assembly & Live Preview
-When the user places the videos in `videos/` (or already has videos):
-1. Scan `videos/` (or specified folder) for `.mp4` clips in sequence.
+### Step 3: Phase B — Connectors (the clips that make it ONE world)
+When the dives land, build **N−1 short connector clips** (5 s) so the sections flow without cuts. A connector's two endpoints are pinned to ACTUAL rendered frames — that's why it can't drift:
+
+1. Extract boundary frames from the RENDERED dives (not the stills). If `ffmpeg` exists run it yourself:
+   ```bash
+   ffmpeg -sseof -0.15 -i videos/video1.mp4 -frames:v 1 -q:v 2 last1.png    # dive 1 interior
+   ffmpeg -ss 0      -i videos/video2.mp4 -frames:v 1 -q:v 2 first2.png    # dive 2 establishing
+   ```
+   No ffmpeg on device? Tell the user to grab the last frame of `video_i` and the first frame of `video_{i+1}` from their video player/tool and drop them in the project.
+2. Present the connector spec table:
+
+   | Connector | Start frame (upload) | End frame (upload) | Prompt | Save as |
+   |---|---|---|---|---|
+   | conn1 | `last1.png` | `first2.png` | "Camera pulls up out of <scene 1>, glides across the connected world, descends toward <scene 2>…" (5 s) | `videos/conn1.mp4` |
+   | conn2 | `last2.png` | `first3.png` | … | `videos/conn2.mp4` |
+
+3. State the fallback up front: **if the user's tool has no end-frame slot, don't force it** — say you'll wire those connectors as `null` and the engine crossfades those seams directly. The page still completes.
+
+### Step 4: Video Assembly & Live Preview
+When the clips are in `videos/` (or the user already had videos):
+1. Scan `videos/` for the dive clips in sequence; connectors map gap-by-gap (`conn_i` between `video_i` and `video_{i+1}`).
 2. Auto-extract poster frames (`ffmpeg -ss 0 -i video1.mp4 -frames:v 1 -q:v 2 video1_poster.webp` if ffmpeg exists).
-3. Connect the clips into `mountLetsScroll()` in `index.html`.
+3. Wire `mountLetsScroll()` in `index.html` — `sections[k].clip = videos/videoK.mp4`, `connectors = ['videos/conn1.mp4', …]` (length = sections − 1; missing connectors → `null` entries, engine crossfades).
 4. Run `zyvo preview .` to start the background server, auto-open the device browser, and deliver the Local + Temporary Public Live Link!
 
 ---
