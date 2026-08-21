@@ -200,10 +200,7 @@ fi
 #   /storage/emulated/0/zyvo/
 #   ├── <project1>/    (zyvo <project1> or zyvo session <project1>)
 #   ├── <project2>/    (zyvo <project2>)
-#   ├── default/       (first-run workspace)
-#   └── untitled-N/    (auto workspaces — created whenever `default`
-#                       already holds real files, so a brand-new session
-#                       never piles its work onto an older session's)
+#   └── default/       (zyvo)
 #
 # Every project works strictly inside its own dedicated subfolder
 # so files from different projects never mix or conflict!
@@ -214,15 +211,6 @@ elif [ -d /sdcard ]; then WS_BASE=/sdcard
 fi
 SDIR_ROOT="${WS_BASE:-$HOME}/zyvo"
 mkdir -p "$SDIR_ROOT" 2>/dev/null || true
-
-has_real_files() { # dir -> ok if any NON-hidden entry exists
-    # dot-entries (.opencode session metadata etc.) don't match the glob,
-    # so a folder holding only chat history still counts as unused
-    for e in "$1"/*; do
-        [ -e "$e" ] && return 0
-    done
-    return 1
-}
 
 SESSION_MODE=0
 SESSION_NAME=""
@@ -250,7 +238,6 @@ while [ "$#" -gt 0 ]; do
                 echo ""
                 echo "Open or create: zyvo <project-name>"
                 echo "Example:        zyvo coffee-shop"
-                echo "Bare zyvo:      fresh workspace (ager kaj alaka thakbe)"
                 echo ""
                 exit 0
             fi
@@ -277,32 +264,19 @@ done
 if [ -z "$SESSION_NAME" ]; then
     case "$PWD" in
         "$SDIR_ROOT"/*)
-            # Already inside a project subfolder — respect the explicit cd,
-            # but say WHERE we are so old work is never a surprise
+            # Already inside a project subfolder
             export OPENCODE_DEFAULT_DIR="$PWD"
-            echo "zyvo: project: $(basename "$PWD")  (notun project? 'zyvo <name>')"
-            ;;
-        "$HOME"|"$SDIR_ROOT")
-            # No explicit target (launched from home / zyvo root).
-            # Fresh-start routing: reuse `default` only while it holds no
-            # real files; once work exists there, open a clean untitled-N
-            # workspace instead — a new session must never start on top of
-            # an older session's files.
-            CAND="$SDIR_ROOT/default"
-            if has_real_files "$CAND"; then
-                n=1
-                while [ -e "$SDIR_ROOT/untitled-$n" ]; do n=$((n+1)); done
-                CAND="$SDIR_ROOT/untitled-$n"
-                mkdir -p "$CAND" 2>/dev/null || true
-                echo "zyvo: notun workspace: untitled-$n  (ager kaj 'default' e ache — 'zyvo default' diye khulun)"
-            fi
-            mkdir -p "$CAND" 2>/dev/null || true
-            cd "$CAND"
-            export OPENCODE_DEFAULT_DIR="$CAND"
             ;;
         *)
-            # Any other directory the user deliberately cd'd into — work there
-            export OPENCODE_DEFAULT_DIR="$PWD"
+            if [ "$PWD" = "$HOME" ] || [ "$PWD" = "$SDIR_ROOT" ]; then
+                # Default dedicated folder so root is never cluttered
+                SDIR="$SDIR_ROOT/default"
+                mkdir -p "$SDIR" 2>/dev/null || true
+                cd "$SDIR"
+                export OPENCODE_DEFAULT_DIR="$SDIR"
+            else
+                export OPENCODE_DEFAULT_DIR="$PWD"
+            fi
             ;;
     esac
 else
