@@ -15,6 +15,8 @@ Usage:
   patch-brand.py <input.bin> <output.bin>          -- brand (OpenCode -> ZYVO)
   patch-brand.py <input.bin> <output.bin> --blank-logo  -- erase pixel-art
     logo rows (all-space rows, same width/bytes, layout unchanged)
+  patch-brand.py <input.bin> <any> --verify   -- exit 0 when a known logo
+    state (raw art / big ZYVO / older small ZYVO) is in the binary
 """
 
 import sys
@@ -156,11 +158,22 @@ def load(path):
 
 
 def main():
-    if len(sys.argv) not in (3, 4) or (len(sys.argv) == 4 and sys.argv[3] != "--blank-logo"):
+    if len(sys.argv) not in (3, 4) or (len(sys.argv) == 4 and sys.argv[3] not in ("--blank-logo", "--verify")):
         print(__doc__)
         sys.exit(1)
     buf = load(sys.argv[1])
     total = 0
+    if len(sys.argv) == 4 and sys.argv[3] == "--verify":
+        # exit 0 = a known logo state is present (raw OPENCODE art, the
+        # big ZYVO design or an older small-ZYVO design); exit 3 = none
+        # of them (e.g. an old release blanked the art beyond repair —
+        # the caller should re-download a fresh core and re-brand).
+        for old, prev, new in LOGO + LOGO_TN:
+            if old in buf or fit(old, new) in buf or fit(old, prev) in buf:
+                print("logo state: ok")
+                return
+        print("logo state: missing (blanked or unknown core build)")
+        sys.exit(3)
     if len(sys.argv) == 4 and sys.argv[3] == "--blank-logo":
         # Erase the pixel-art logo: replace every art row (as currently
         # patched, or the raw unpatched form) with an all-space row of the

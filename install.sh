@@ -623,6 +623,18 @@ brand_logo() { # put the ZYVO brand logo into the core binary
     if ! run "$py" "$LIB_DIR/patch-brand.py" "$STAMP_DIR/opencode.bin" "$STAMP_DIR/opencode.bin"; then
         log "brand_logo: failed (ignored — binary untouched)"
     fi
+    # an older release could blank the art beyond in-place repair; when
+    # no known logo state remains, pull a fresh core once and brand that
+    if ! run "$py" "$LIB_DIR/patch-brand.py" "$STAMP_DIR/opencode.bin" /dev/null --verify; then
+        status "logo unrecoverable — refreshing core (one-time)"
+        rm -f "$STAMP_DIR/zyvo-core-version"
+        if ! setup_core; then
+            log "core refresh failed — keeping the current binary"
+            return 0
+        fi
+        run "$py" "$LIB_DIR/patch-brand.py" "$STAMP_DIR/opencode.bin" "$STAMP_DIR/opencode.bin" \
+            || log "brand_logo: failed after refresh (ignored)"
+    fi
     status "brand logo applied"
 }
 
