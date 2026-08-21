@@ -35,10 +35,11 @@
          tighter-GOP — seek cost on a phone decoder is dominated by frames-from-keyframe,
          so a 720p, -g 4 file scrubs far smoother than the 1080p desktop master; see
          pipeline.md). Falls back to the desktop `clip` if no mobile variant is given.
-       - uses `stillMobile` as the scene poster when provided (pair it with native 9:16
-         clipMobile renders so the poster matches the portrait video's first frame instead
-         of flashing from a landscape crop). Chosen once at mount; a desktop resize into
-         phone width keeps the desktop poster (clips still switch via isMobile()).
+        - uses `stillMobile` as the scene poster when provided (pair it with native 9:16
+          clipMobile renders so the poster matches the portrait video's first frame instead
+          of flashing from a landscape crop). Chosen once at mount; a desktop resize into
+          phone width keeps the desktop poster, and clips already fetched keep their
+          desktop encode — sources are picked once per session (reload for a different mix).
        - coalesces seeks (never issues a new currentTime while the decoder is still
          `seeking`) so fast flicks can't pile up and freeze the video.
        - keeps the still as a live poster until the clip actually paints its first frame,
@@ -221,7 +222,7 @@ function mountLetsScroll(container, config) {
 
   function read() {
     const y = window.scrollY || window.pageYOffset;
-    const fade = CROSSFADE * vh;
+    const fade = Math.max(CROSSFADE * vh, 1);   // ≥1px: keeps 1-outside/fade finite at crossfade:0
     let ci = 0;
     for (let i = 0; i < NSEG; i++) if (y >= SEGMENTS[i].start) ci = i;
 
