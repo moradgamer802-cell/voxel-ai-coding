@@ -1,5 +1,5 @@
-#!/data/data/com.termux/files/usr/bin/bash
-# zyvo-uninstall — cleanly removes ZYVO from the device
+﻿#!/data/data/com.termux/files/usr/bin/bash
+# zyvo-uninstall â€” cleanly removes ZYVO from the device
 #
 # Usage:
 #   zyvo uninstall          (asks for confirmation)
@@ -53,9 +53,9 @@ rm -f "$BIN_DIR/zyvo" "$BIN_DIR/zyvo-menu" "$BIN_DIR/oc-settings"
 rm -f "$LIBEXEC_DIR/opencode.bin" "$LIBEXEC_DIR/zyvo-core-version"
 rm -rf "$LIBEXEC_DIR" "$LIB_DIR"
 rm -rf "$CONFIG_DIR"
-echo "  ✓ launchers removed"
-echo "  ✓ config layer removed ($CONFIG_DIR)"
-echo "  ✓ core removed"
+echo "  âœ“ launchers removed"
+echo "  âœ“ config layer removed ($CONFIG_DIR)"
+echo "  âœ“ core removed"
 
 # clean ~/.bashrc additions (only the ZYVO lines)
 RC="$HOME_DIR/.bashrc"
@@ -63,9 +63,9 @@ RC="$HOME_DIR/.bashrc"
 if [ -f "$RC" ]; then
     grep -v "ZYVO AI\|ZYVO PATH\|OPENCODE_API_KEY=" "$RC" > "$RC.zyvo-clean" 2>/dev/null || true
     mv "$RC.zyvo-clean" "$RC"
-    echo "  ✓ PATH + API key lines removed from $(basename "$RC")"
+    echo "  âœ“ PATH + API key lines removed from $(basename "$RC")"
 fi
 
 echo
 echo "ZYVO uninstalled. Your projects are still at /storage/emulated/0/zyvo."
-echo "Reinstall any time with:  curl -fsSL https://raw.githubusercontent.com/zyvo9/zyvo/main/install.sh | bash"
+echo "Reinstall any time with:  curl -fsSL https://raw.githubusercontent.com/zyvo9/boomcode/main/install.sh | bash"

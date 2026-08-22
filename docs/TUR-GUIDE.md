@@ -1,4 +1,4 @@
-# Publishing ZYVO to the Termux User Repository (TUR)
+﻿# Publishing ZYVO to the Termux User Repository (TUR)
 
 This guide takes the ZYVO Termux package from "works on my phone" to
 `pkg install zyvo` for everyone.
@@ -8,7 +8,7 @@ This guide takes the ZYVO Termux package from "works on my phone" to
   Any developer can submit a package via pull request; the TUR
   maintainers review and merge it. Once merged, users enable the
   repo and run `pkg install zyvo`.
-- **Time:** usually days to weeks (external review — outside our control).
+- **Time:** usually days to weeks (external review â€” outside our control).
 
 ## 1. Understand the layout
 
@@ -21,7 +21,7 @@ for a Termux install (`$PREFIX` = `/data/data/com.termux/files/usr`):
 | `$PREFIX/libexec/opencode/opencode.bin` | the core engine binary |
 | `$PREFIX/libexec/opencode/zyvo-core-version` | core version stamp |
 | `$PREFIX/lib/libtagfix.so` (+ other libs) | native libraries     |
-| `$HOME/.config/opencode/` | config, agents, commands, skills (user data — NOT packaged) |
+| `$HOME/.config/opencode/` | config, agents, commands, skills (user data â€” NOT packaged) |
 
 Because the package only ships the wrapper + binary + libs (config is
 user-level and already written by the installer), no script changes are
@@ -40,12 +40,12 @@ mkdir -p packages/zyvo
 Create `packages/zyvo/build.sh`:
 
 ```bash
-TERMUX_PKG_HOMEPAGE=https://github.com/zyvo9/zyvo
+TERMUX_PKG_HOMEPAGE=https://github.com/zyvo9/boomcode
 TERMUX_PKG_DESCRIPTION="ZYVO - ready-to-use AI coding CLI (OpenCode) for Termux"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@zyvo9"
 TERMUX_PKG_VERSION=0.2.1
-TERMUX_PKG_SRCURL=https://github.com/zyvo9/zyvo/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
+TERMUX_PKG_SRCURL=https://github.com/zyvo9/boomcode/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=false
 
@@ -73,7 +73,7 @@ termux_step_make_install() {
 
 > Note: the `TERMUX_PKG_SRCURL` assumes the repo is tagged `v0.2.1`;
 > add the tag when first publishing. The exact core URL/version must
-> match the current `guysoft/opencode-termux` release — read it from
+> match the current `guysoft/opencode-termux` release â€” read it from
 > install.sh before packaging.
 
 Test the build locally (requires Docker, works on any OS):
@@ -94,7 +94,7 @@ Fix any errors, repeat until the .deb builds cleanly.
    package, and that it builds aarch64 (and rename the PR title to
    `zyvo: add package`).
 
-## 4. After merge — users install with
+## 4. After merge â€” users install with
 
 ```bash
 pkg install tur-repo        # one-time: enable the TUR repo
@@ -108,9 +108,9 @@ Note that `zyvo` still uses the `OPENCODE_API_KEY` from the shell rc
 
 ## Troubleshooting
 
-- **`.build-package.sh` errors** — check TUR's README; the builder
+- **`.build-package.sh` errors** â€” check TUR's README; the builder
   container must be pulled first (`docker compose build`).
-- **Core URL changed** — the `guysoft/opencode-termux` release may update;
+- **Core URL changed** â€” the `guysoft/opencode-termux` release may update;
   bump `CORE_VERSION`/URL in build.sh to match the latest release.
-- **Reviewer requests changes** — usually signing of the package or
+- **Reviewer requests changes** â€” usually signing of the package or
   version pins; address them in the PR thread.

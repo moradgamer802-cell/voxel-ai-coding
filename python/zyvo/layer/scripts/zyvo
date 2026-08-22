@@ -1,15 +1,15 @@
-#!/data/data/com.termux/files/usr/bin/sh
-# zyvo — wrapper that disables Android bionic TBI heap pointer tagging
+﻿#!/data/data/com.termux/files/usr/bin/sh
+# zyvo â€” wrapper that disables Android bionic TBI heap pointer tagging
 #
 # The real zyvo binary is zyvo.bin; this script LD_PRELOAD's libtagfix.so
 # (a constructor that calls mallopt to turn off heap tagging) before exec'ing it.
 # Without this, Bun/JSC's NaN-boxing clears the 0xB4 top-byte tag on heap
 # pointers, causing bionic to SIGABRT on free(): "Pointer tag ... was truncated".
 #
-# Permission system: none — everything is allowed by config (beginner CLI
+# Permission system: none â€” everything is allowed by config (beginner CLI
 # design, no prompts). The wrapper does not enforce any permissions.
 #
-# Named sessions: zyvo session <name> — opens <base>/zyvo/<name>/ and
+# Named sessions: zyvo session <name> â€” opens <base>/zyvo/<name>/ and
 # resumes the previous chat history with --continue. zyvo session = list.
 #
 # Path resolution order (supports both standalone zip and installed package):
@@ -29,22 +29,22 @@ export OPENCODE_DISABLE_TUI_AUDIO="${OPENCODE_DISABLE_TUI_AUDIO:-1}"
 mkdir -p "$TMPDIR" 2>/dev/null || true
 
 # ---- zyvo update: reruns the delta installer ----
-# (if the core is unchanged it is 0 MB — only the ZYVO layer refreshes)
+# (if the core is unchanged it is 0 MB â€” only the ZYVO layer refreshes)
 if [ "${1:-}" = "update" ] || [ "${1:-}" = "upgrade" ]; then
     shift
-    echo "zyvo: checking for updates (delta — 0 MB if the core is unchanged)"
-    UPDATER_URL="https://raw.githubusercontent.com/zyvo9/zyvo/main/install.sh"
+    echo "zyvo: checking for updates (delta â€” 0 MB if the core is unchanged)"
+    UPDATER_URL="https://raw.githubusercontent.com/zyvo9/boomcode/main/install.sh"
     if curl -fsSL --retry 3 --connect-timeout 15 --max-time 120 -o "$TMPDIR/zyvo-update.sh" "$UPDATER_URL" 2>/dev/null; then
         exec sh "$TMPDIR/zyvo-update.sh" "$@"
     fi
-    echo "zyvo: could not fetch the update script — check your internet" >&2
+    echo "zyvo: could not fetch the update script â€” check your internet" >&2
     exit 1
 fi
 
 # ---- zyvo uninstall: removes ZYVO cleanly (needs the repo script) ----
 if [ "${1:-}" = "uninstall" ]; then
     shift
-    UNINSTALLER_URL="https://raw.githubusercontent.com/zyvo9/zyvo/main/scripts/zyvo-uninstall"
+    UNINSTALLER_URL="https://raw.githubusercontent.com/zyvo9/boomcode/main/scripts/zyvo-uninstall"
     UNINSTALLER=""
     # prefer a local copy (installed layout), else the current repo
     for c in "$dir/../share/zyvo/scripts/zyvo-uninstall" "$dir/zyvo-uninstall" "$TMPDIR/zyvo-uninstall"; do
@@ -58,7 +58,7 @@ if [ "${1:-}" = "uninstall" ]; then
     if [ -n "$UNINSTALLER" ]; then
         exec sh "$UNINSTALLER" "$@"
     fi
-    echo "zyvo: could not fetch the uninstaller — check your internet" >&2
+    echo "zyvo: could not fetch the uninstaller â€” check your internet" >&2
     exit 1
 fi
 
@@ -83,7 +83,7 @@ if [ "${1:-}" = "preview" ] || [ "${1:-}" = "open" ] || [ "${1:-}" = "share" ] |
     PREVIEW_DIR="${PREVIEW_DIR:-$PWD}"
     [ -d "$PREVIEW_DIR" ] || { echo "zyvo: no such folder: $PREVIEW_DIR" >&2; exit 1; }
     if ! command -v python3 >/dev/null 2>&1; then
-        echo "zyvo: python3 is required for preview — install it (pkg install python)" >&2
+        echo "zyvo: python3 is required for preview â€” install it (pkg install python)" >&2
         exit 1
     fi
 
@@ -181,14 +181,14 @@ target_url = public_url if public_url else local_url
 open_browser(target_url)
 
 print("\n" + "=" * 50)
-print("  🚀 ZYVO Web Preview Ready!")
+print("  ðŸš€ ZYVO Web Preview Ready!")
 print("=" * 50)
 if public_url:
-    print(f"  🌍 Public Live URL : {public_url}")
+    print(f"  ðŸŒ Public Live URL : {public_url}")
     print(f"     (Share this live HTTPS link with anyone!)")
-print(f"  🏠 Local URL       : {local_url}")
-print(f"  📂 Folder          : {preview_dir}")
-print(f"  📱 Opened automatically in your device browser.")
+print(f"  ðŸ  Local URL       : {local_url}")
+print(f"  ðŸ“‚ Folder          : {preview_dir}")
+print(f"  ðŸ“± Opened automatically in your device browser.")
 print("=" * 50 + "\n")
 
 sys.exit(0)
@@ -198,9 +198,9 @@ fi
 # ---- workspace and session resolver ----
 # Structure:
 #   /storage/emulated/0/zyvo/
-#   ├── <project1>/    (zyvo <project1> or zyvo session <project1>)
-#   ├── <project2>/    (zyvo <project2>)
-#   └── default/       (zyvo)
+#   â”œâ”€â”€ <project1>/    (zyvo <project1> or zyvo session <project1>)
+#   â”œâ”€â”€ <project2>/    (zyvo <project2>)
+#   â””â”€â”€ default/       (zyvo)
 #
 # Every project works strictly inside its own dedicated subfolder
 # so files from different projects never mix or conflict!
@@ -224,13 +224,13 @@ while [ "$#" -gt 0 ]; do
                 SESSION_NAME="$1"; shift; SESSION_MODE=1
             else
                 echo ""
-                echo "📁 ZYVO Projects ($SDIR_ROOT):"
+                echo "ðŸ“ ZYVO Projects ($SDIR_ROOT):"
                 if [ -d "$SDIR_ROOT" ]; then
                     count=0
                     for d in "$SDIR_ROOT"/*; do
                         if [ -d "$d" ]; then
                             b="$(basename "$d")"
-                            [ "$b" != ".opencode" ] && echo "  🔹 $b" && count=$((count+1))
+                            [ "$b" != ".opencode" ] && echo "  ðŸ”¹ $b" && count=$((count+1))
                         fi
                     done
                     [ $count -eq 0 ] && echo "  (no project folders yet)"
@@ -299,9 +299,9 @@ fi
 
 # ---- ghost-config self-heal ----
 # Old ZYVO versions wrote model ids in a format opencode rejects
-# ("deepseek-v4-flash-free" bare → popup "…/ is not valid"). Those keys
+# ("deepseek-v4-flash-free" bare â†’ popup "â€¦/ is not valid"). Those keys
 # can survive in global config, the workspace project dir, or project
-# .opencode/ agent files — strip them on every launch so the picker
+# .opencode/ agent files â€” strip them on every launch so the picker
 # falls back to the stock default. Fast, silent, safe.
 if command -v python3 >/dev/null 2>&1; then
     python3 - "$HOME" "${WS_BASE:-$HOME}" >/dev/null 2>&1 <<'PYGC' || true
@@ -345,7 +345,7 @@ def clean_md(p):
 for root in roots:
     if not os.path.isdir(root):
         continue
-    # stale /model command files are removed — the built-in /models picker
+    # stale /model command files are removed â€” the built-in /models picker
     # is the only model command that should exist
     cdir = os.path.join(root, "command")
     if os.path.isdir(cdir):
@@ -405,7 +405,7 @@ if [ -n "$NATIVE_LIB_DIR" ]; then
         export OPENCODE_BUN_PATH="$NATIVE_LIB_DIR/bun"
     fi
 elif [ -n "$PREFIX" ] && [ -d "$PREFIX" ]; then
-    # warn only on real Termux — glibc Linux does not need the native lib
+    # warn only on real Termux â€” glibc Linux does not need the native lib
     echo "zyvo: warning: native library directory not found, may crash on Android 11+" >&2
 fi
 

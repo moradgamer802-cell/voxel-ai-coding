@@ -4,11 +4,11 @@
 
 **AI coding CLI for Termux â€” native Android, zero config, free AI models**
 
-[![Platform](https://img.shields.io/badge/platform-Termux%20%7C%20Android%20%7C%20Linux%20%7C%20macOS-006a4e?style=flat-square&logo=linux)](https://github.com/zyvo9/zyvo)
+[![Platform](https://img.shields.io/badge/platform-Termux%20%7C%20Android%20%7C%20Linux%20%7C%20macOS-006a4e?style=flat-square&logo=linux)](https://github.com/zyvo9/boomcode)
 [![PyPI](https://img.shields.io/pypi/v/zyvo.svg?style=flat-square&color=10a37f)](https://pypi.org/project/zyvo)
 [![AI](https://img.shields.io/badge/AI-DeepSeek%20free-10a37f?style=flat-square&logo=openai)](https://opencode.ai/zen)
 [![Model](https://img.shields.io/badge/model-deepseek--v4--flash--free-0e7665?style=flat-square)](https://opencode.ai/zen)
-[![Setup](https://img.shields.io/badge/setup-zero%20config-f42a41?style=flat-square)](https://github.com/zyvo9/zyvo)
+[![Setup](https://img.shields.io/badge/setup-zero%20config-f42a41?style=flat-square)](https://github.com/zyvo9/boomcode)
 [![License](https://img.shields.io/badge/license-MIT-8aa7a3?style=flat-square)](LICENSE)
 
 </div>
@@ -20,7 +20,7 @@ on Ubuntu proot / Debian / Chromebook / WSL / macOS as well.
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zyvo9/zyvo/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zyvo9/boomcode/main/install.sh | bash
 ```
 
 Also on PyPI â€” same installer, layer fetched through pip:

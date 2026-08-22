@@ -1,15 +1,15 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # ============================================================
-#  ZYVO — one-line installer
+#  ZYVO â€” one-line installer
 #  Install: curl -fsSL https://raw.githubusercontent.com/
-#           zyvo9/zyvo/main/install.sh | bash
+#           zyvo9/boomcode/main/install.sh | bash
 #      or:  pip install zyvo && zyvo        (same installer)
 #
 #  When run by the pip bootstrap, the ZYVO layer is already on
 #  disk at $ZYVO_BOOT and is used instead of downloading it.
 #
 #  Shows a SINGLE live progress line:
-#    [██████░░░░░░░░░░░░░░] 32% | 9.4/29.1 MB | 1.1 MB/s | downloading core
+#    [â–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–ˆâ–‘â–‘â–‘â–‘â–‘â–‘â–‘â–‘â–‘â–‘â–‘â–‘â–‘â–‘] 32% | 9.4/29.1 MB | 1.1 MB/s | downloading core
 #  Everything else is logged to a file; errors print the log tail.
 #  Safe to re-run (idempotent): existing tools/binaries are skipped.
 # ============================================================
@@ -19,7 +19,7 @@ umask 022
 # ------------------------------------------------------------
 # Configuration
 # ------------------------------------------------------------
-GH_REPO="${GH_REPO:-zyvo9/zyvo}"
+GH_REPO="${GH_REPO:-zyvo9/boomcode}"
 CORE_REPO="guysoft/opencode-termux"
 API="https://api.github.com"
 CORE_API="$API/repos/$CORE_REPO"
@@ -51,7 +51,7 @@ else
         *)                          ENV_KIND="posix" ;;   # never a dead end
     esac
 fi
-# iSH / Alpine on iOS, chromeOS crostini, WSL — all behave like linux
+# iSH / Alpine on iOS, chromeOS crostini, WSL â€” all behave like linux
 [ -n "$WSL_DISTRO_NAME" ] && ENV_KIND="linux"
 
 RAW_ARCH="$(uname -m)"
@@ -87,8 +87,8 @@ bar() { # <pct> -> 20-char bar
     local pct=$1 filled empty i s=""
     [ "$pct" -gt 100 ] && pct=100
     filled=$(( pct * 20 / 100 )); empty=$(( 20 - filled ))
-    i=0; while [ $i -lt $filled ]; do s="${s}█"; i=$((i+1)); done
-    i=0; while [ $i -lt $empty ]; do s="${s}░"; i=$((i+1)); done
+    i=0; while [ $i -lt $filled ]; do s="${s}â–ˆ"; i=$((i+1)); done
+    i=0; while [ $i -lt $empty ]; do s="${s}â–‘"; i=$((i+1)); done
     printf '%s' "$s"
 }
 
@@ -104,7 +104,7 @@ bump()   { PROG="$1"; draw; }
 log()    { printf '%s\n' "$*" >> "$LOG" 2>/dev/null || true; }
 run()    { "$@" >> "$LOG" 2>&1; }
 
-run_bg() { # <label> <cmd...> — run in background, animate the status line
+run_bg() { # <label> <cmd...> â€” run in background, animate the status line
     local label="$1"; shift
     "$@" >> "$LOG" 2>&1 &
     local pid=$! i=0
@@ -120,13 +120,13 @@ run_bg() { # <label> <cmd...> — run in background, animate the status line
 
 spinner() { # <tick 1-10> -> braille frame (POSIX sh compatible)
     case $(( $1 % 10 )) in
-        1) printf '⠋';; 2) printf '⠙';; 3) printf '⠹';; 4) printf '⠸';;
-        5) printf '⠼';; 6) printf '⠴';; 7) printf '⠦';; 8) printf '⠧';;
-        9) printf '⠇';; *) printf '⠏';;
+        1) printf 'â ‹';; 2) printf 'â ™';; 3) printf 'â ¹';; 4) printf 'â ¸';;
+        5) printf 'â ¼';; 6) printf 'â ´';; 7) printf 'â ¦';; 8) printf 'â §';;
+        9) printf 'â ‡';; *) printf 'â ';;
     esac
 }
 
-download_file() { # <url> <out> <label> — live %, MB + speed on the same line
+download_file() { # <url> <out> <label> â€” live %, MB + speed on the same line
     local url="$1" out="$2" label="$3"
     local total=0 got=0 last=0 t0 t1 pct pid
     total="$(curl -sIL --connect-timeout 10 --max-time 20 "$url" \
@@ -159,8 +159,8 @@ download_file() { # <url> <out> <label> — live %, MB + speed on the same line
 }
 
 fatal() {
-    printf "\r\033[K\n  ${C_R}✖ ERROR${C_N} %s\n" "$1" 2>/dev/null || printf "\n  ✖ ERROR %s\n" "$1"
-    [ -n "$2" ] && printf "  → %s\n" "$2"
+    printf "\r\033[K\n  ${C_R}âœ– ERROR${C_N} %s\n" "$1" 2>/dev/null || printf "\n  âœ– ERROR %s\n" "$1"
+    [ -n "$2" ] && printf "  â†’ %s\n" "$2"
     [ -s "$LOG" ] && { printf "  ${C_D}last log lines:${C_N}\n"; tail -n 5 "$LOG"; }
     exit 1
 }
@@ -234,7 +234,7 @@ PY
 }
 
 # ------------------------------------------------------------
-# Step 1 — environment + paths
+# Step 1 â€” environment + paths
 # ------------------------------------------------------------
 setup_env() {
     status "checking environment"
@@ -246,7 +246,7 @@ setup_env() {
             BIN_DIR="${ZYVO_BIN_DIR:-$HOME/.local/bin}"
             STAMP_DIR="$HOME/.local/libexec/zyvo"; LIB_DIR="$HOME/.local/lib/zyvo"
             mkdir -p "$BIN_DIR" "$STAMP_DIR" "$LIB_DIR" 2>/dev/null || {
-                # read-only or exotic $HOME — keep going in a writable place
+                # read-only or exotic $HOME â€” keep going in a writable place
                 BIN_DIR="${TMPDIR:-/tmp}/zyvo/bin"; STAMP_DIR="${TMPDIR:-/tmp}/zyvo/libexec"
                 LIB_DIR="${TMPDIR:-/tmp}/zyvo/lib"
                 mkdir -p "$BIN_DIR" "$STAMP_DIR" "$LIB_DIR"
@@ -264,7 +264,7 @@ setup_env() {
         termux/aarch64|termux/x86_64|linux/aarch64|linux/x86_64|macos/aarch64|macos/x86_64) NATIVE_CORE=1 ;;
         *)
             NATIVE_CORE=0
-            printf "\r\033[K  ${C_Y}!${C_N} %s CPU has no native core build — using the Node build\n" "$RAW_ARCH"
+            printf "\r\033[K  ${C_Y}!${C_N} %s CPU has no native core build â€” using the Node build\n" "$RAW_ARCH"
             ;;
     esac
     status "environment ok ($ENV_KIND/$RAW_ARCH)"
@@ -272,7 +272,7 @@ setup_env() {
 }
 
 # ------------------------------------------------------------
-# Universal package installer — works on every mainstream package
+# Universal package installer â€” works on every mainstream package
 # manager; silently succeeds as a no-op when none is usable.
 # ------------------------------------------------------------
 SUDO=""
@@ -280,7 +280,7 @@ if [ "$(id -u 2>/dev/null)" != "0" ] && [ "$ENV_KIND" != "termux" ] && cmd_exist
     SUDO="sudo"
 fi
 
-pm_install() { # <packages...> — runs the package manager LIVE on screen.
+pm_install() { # <packages...> â€” runs the package manager LIVE on screen.
     # The user watches the real pkg/apt/npm-style progress instead of a
     # silent spinner, so long installs never feel frozen. Every branch is
     # wrapped in `if` so a failing PM just falls through to the next one
@@ -309,7 +309,7 @@ pm_install() { # <packages...> — runs the package manager LIVE on screen.
 }
 
 # ------------------------------------------------------------
-# Step 2 — dependencies (auto-install missing, skip existing)
+# Step 2 â€” dependencies (auto-install missing, skip existing)
 # ------------------------------------------------------------
 setup_deps() {
     status "checking dependencies"
@@ -335,12 +335,12 @@ setup_deps() {
     bump 10
 }
 warn_deps() {
-    printf "\r\033[K  ${C_Y}!${C_N} could not auto-install:%s — continuing with what exists\n" "$1"
+    printf "\r\033[K  ${C_Y}!${C_N} could not auto-install:%s â€” continuing with what exists\n" "$1"
     STATUS="dependencies partial"
 }
 
 # ------------------------------------------------------------
-# Step 3 — core engine (delta aware)
+# Step 3 â€” core engine (delta aware)
 # ------------------------------------------------------------
 install_portable_node() { # last resort: official Node tarball into $LIB_DIR
     local nver="v22.14.0" nos narch url
@@ -382,7 +382,7 @@ setup_core_npm() { # architecture-neutral fallback (32-bit ARM, x86, odd ROMs)
     fi
 
     mkdir -p "$BIN_DIR" "$STAMP_DIR" "$LIB_DIR"
-    status "installing core (npm) — live output:"
+    status "installing core (npm) â€” live output:"
     if ! npm install -g opencode-ai; then
         fatal "npm core install failed" "Check your internet, then rerun."
     fi
@@ -424,11 +424,11 @@ setup_core() {
         installed=""
         [ -f "$STAMP_DIR/zyvo-core-version" ] && installed="$(tr -d '[:space:]' < "$STAMP_DIR/zyvo-core-version" 2>/dev/null)"
         if [ -n "$tag" ] && [ "$tag" = "$installed" ] && [ -x "$STAMP_DIR/opencode.bin" ]; then
-            status "core up-to-date ($tag) — 0 MB"
+            status "core up-to-date ($tag) â€” 0 MB"
             bump 70
             return
         fi
-        [ -n "$installed" ] && status "core update: $installed → ${tag:-latest}"
+        [ -n "$installed" ] && status "core update: $installed â†’ ${tag:-latest}"
 
         if [ "$ARCH" = "x86_64" ]; then
             zip_url="$(json_asset_url "$CORE_API/releases/latest" "android-x86_64")"
@@ -437,13 +437,13 @@ setup_core() {
             zip_url="$(json_asset_url "$CORE_API/releases/latest" "$AARCH64_MATCH")"
         fi
         if [ -z "$zip_url" ]; then
-            # release has no matching Android build — stay installable
+            # release has no matching Android build â€” stay installable
             setup_core_npm
             return
         fi
 
         if ! download_file "$zip_url" "$TMP/core.zip" "downloading core"; then
-            printf "\r\033[K  ${C_Y}!${C_N} native core download failed — trying the Node build\n"
+            printf "\r\033[K  ${C_Y}!${C_N} native core download failed â€” trying the Node build\n"
             setup_core_npm
             return
         fi
@@ -454,7 +454,7 @@ setup_core() {
             expected="$(grep "$(basename "$zip_url")" "$TMP/SHA256SUMS" | awk '{print $1}' | head -n1)"
             actual="$(sha256sum "$TMP/core.zip" | awk '{print $1}')"
             if [ -n "$expected" ] && [ "$expected" != "$actual" ]; then
-                fatal "checksum mismatch — download corrupted" "Rerun the installer."
+                fatal "checksum mismatch â€” download corrupted" "Rerun the installer."
             fi
             status "integrity ok (SHA256)"
         fi
@@ -462,7 +462,7 @@ setup_core() {
         run_bg "extracting core" bash -c "cd '$TMP' && unzip -oq core.zip" \
             || fatal "couldn't extract the core zip" "Rerun the installer."
         [ -f "$TMP/opencode.bin" ] || [ -f "$TMP/opencode" ] \
-            || fatal "core zip has no binary" "The release format changed — report it."
+            || fatal "core zip has no binary" "The release format changed â€” report it."
 
         mkdir -p "$BIN_DIR" "$STAMP_DIR" "$LIB_DIR"
         if [ -f "$TMP/opencode.bin" ]; then install -m755 "$TMP/opencode.bin" "$STAMP_DIR/opencode.bin"
@@ -472,9 +472,9 @@ setup_core() {
         done
         [ -e "$PREFIX/bin/opencode" ] && mv "$PREFIX/bin/opencode" "$PREFIX/bin/opencode.bak" 2>/dev/null || true
         # last safety net: some 32-bit/older kernels cannot exec the native
-        # binary even when the CPU name looked right — fall back silently.
+        # binary even when the CPU name looked right â€” fall back silently.
         if ! "$STAMP_DIR/opencode.bin" --version >/dev/null 2>&1; then
-            printf "\r\033[K  ${C_Y}!${C_N} native core cannot run on this device — using the Node build\n"
+            printf "\r\033[K  ${C_Y}!${C_N} native core cannot run on this device â€” using the Node build\n"
             setup_core_npm
             return
         fi
@@ -489,14 +489,14 @@ setup_core() {
         [ -f "$STAMP_DIR/zyvo-core-version" ] && installed="$(tr -d '[:space:]' < "$STAMP_DIR/zyvo-core-version" 2>/dev/null)"
         check="$HOME/.opencode/bin/opencode"
         if [ -n "$tag" ] && [ "$tag" = "$installed" ] && [ -x "$check" ]; then
-            status "core up-to-date ($tag) — 0 MB"
+            status "core up-to-date ($tag) â€” 0 MB"
             bump 70
             return
         fi
-        status "installing official core — live output:"
+        status "installing official core â€” live output:"
         if ! bash -c \
             "curl -fsSL --retry 3 --connect-timeout 15 --max-time 120 -o '$TMP/oc-install.sh' '$OPENCODE_INSTALL_URL' && bash '$TMP/oc-install.sh'"; then
-            printf "\r\033[K  ${C_Y}!${C_N} official core installer failed — using the Node build\n"
+            printf "\r\033[K  ${C_Y}!${C_N} official core installer failed â€” using the Node build\n"
             setup_core_npm
             return
         fi
@@ -516,10 +516,10 @@ setup_core() {
 }
 
 # ------------------------------------------------------------
-# Step 4 — ZYVO layer (wrapper, config, skills, commands)
+# Step 4 â€” ZYVO layer (wrapper, config, skills, commands)
 # ------------------------------------------------------------
 setup_layer() {
-    # pip/bootstrap route: layer already on disk — skip network fetch
+    # pip/bootstrap route: layer already on disk â€” skip network fetch
     if [ -n "$ZYVO_BOOT" ] && [ -d "$ZYVO_BOOT/scripts" ] && [ -d "$ZYVO_BOOT/config" ]; then
         status "zyvo layer ready (pip bootstrap)"
         rm -rf "$TMP"/* 2>/dev/null || true
@@ -607,7 +607,7 @@ PYC
     bump 95
 }
 
-install_script() { # $1 src $2 dest — shebang rewritten for non-Termux
+install_script() { # $1 src $2 dest â€” shebang rewritten for non-Termux
     if [ "$ENV_KIND" = "termux" ]; then
         install -m755 "$1" "$2"
     else
@@ -617,9 +617,9 @@ install_script() { # $1 src $2 dest — shebang rewritten for non-Termux
 
 brand_logo() { # put the ZYVO brand logo into the core binary
     # patch-brand.py replaces the "OPENCODE" pixel-art wordmark with the
-    # "ZYVO" design, same byte length (layout stays intact — no crash),
+    # "ZYVO" design, same byte length (layout stays intact â€” no crash),
     # on every install/update. Runs after the layer is on disk (the
-    # script ships in the layer). Idempotent — safe on already-branded
+    # script ships in the layer). Idempotent â€” safe on already-branded
     # binaries (missing rows are skipped).
     [ -f "$LIB_DIR/patch-brand.py" ] || return 0
     [ -f "$STAMP_DIR/opencode.bin" ] || return 0
@@ -628,15 +628,15 @@ brand_logo() { # put the ZYVO brand logo into the core binary
     if cmd_exists python3; then py=python3; else py=python; fi
     status "branding logo (ZYVO)"
     if ! run "$py" "$LIB_DIR/patch-brand.py" "$STAMP_DIR/opencode.bin" "$STAMP_DIR/opencode.bin"; then
-        log "brand_logo: failed (ignored — binary untouched)"
+        log "brand_logo: failed (ignored â€” binary untouched)"
     fi
     # an older release could blank the art beyond in-place repair; when
     # no known logo state remains, pull a fresh core once and brand that
     if ! run "$py" "$LIB_DIR/patch-brand.py" "$STAMP_DIR/opencode.bin" /dev/null --verify; then
-        status "logo unrecoverable — refreshing core (one-time)"
+        status "logo unrecoverable â€” refreshing core (one-time)"
         rm -f "$STAMP_DIR/zyvo-core-version"
         if ! setup_core; then
-            log "core refresh failed — keeping the current binary"
+            log "core refresh failed â€” keeping the current binary"
             return 0
         fi
         run "$py" "$LIB_DIR/patch-brand.py" "$STAMP_DIR/opencode.bin" "$STAMP_DIR/opencode.bin" \
@@ -645,7 +645,7 @@ brand_logo() { # put the ZYVO brand logo into the core binary
     status "brand logo applied"
 }
 
-merge_json() { # $1 user config $2 repo config — merge with force-keys
+merge_json() { # $1 user config $2 repo config â€” merge with force-keys
     local py
     if cmd_exists python3; then py=python3; else py=python; fi
     "$py" - "$1" "$2" <<'PY'
@@ -659,13 +659,13 @@ try:
     repo = json.load(open(repo_path))
 except Exception:
     repo = {}
-# these always come from the repo — ZYVO's core defaults must win
+# these always come from the repo â€” ZYVO's core defaults must win
 # (provider, permissions), otherwise an old install keeps stale values
 FORCE = {"provider", "permission", "agent"}
 for k, v in repo.items():
     if k in FORCE or k not in user:
         user[k] = v
-# model defaults are intentionally NOT forced — ZYVO uses whatever model
+# model defaults are intentionally NOT forced â€” ZYVO uses whatever model
 # the user picked (opencode's own default). Remove stale deepseek keys
 # left by older versions so the picker falls back to the stock default.
 for k in ("model", "small_model"):
@@ -675,7 +675,7 @@ PY
 }
 
 # ------------------------------------------------------------
-# Step 5 — verify
+# Step 5 â€” verify
 # ------------------------------------------------------------
 verify_install() {
     status "verifying"
@@ -721,18 +721,18 @@ brand_logo
 verify_install
 
 # ---- done ----
-PROG=100; STATUS="done ✔"
+PROG=100; STATUS="done âœ”"
 draw
 printf "\n\n"
-printf "  ${C_G}${C_B}⚡ ZYVO READY${C_N}   ${C_D}%s · %s · install time ~%ss${C_N}\n" "$ENV_KIND" "$ARCH" "$SECONDS"
+printf "  ${C_G}${C_B}âš¡ ZYVO READY${C_N}   ${C_D}%s Â· %s Â· install time ~%ss${C_N}\n" "$ENV_KIND" "$ARCH" "$SECONDS"
 printf "  ${C_B}zyvo${C_N}              start the AI (full-power)\n"
 printf "  ${C_B}zyvo preview${C_N}      open a page in the browser\n"
 printf "  ${C_B}zyvo update${C_N}       delta update\n"
-printf "  ${C_B}zyvo session${C_N}      session menu (↑↓ to pick)\n"
+printf "  ${C_B}zyvo session${C_N}      session menu (â†‘â†“ to pick)\n"
 printf "  ${C_B}zyvo doctor${C_N}       health check\n"
 printf "  ${C_B}zyvo backup${C_N}       backup config + projects\n"
 printf "  ${C_B}zyvo uninstall${C_N}    remove ZYVO (keeps projects)\n"
 if [ -n "$ZYVO_BOOT" ]; then
-    printf "  ${C_D}installed via pip — update layer with:${C_N} ${C_B}zyvo install${C_N}\n"
+    printf "  ${C_D}installed via pip â€” update layer with:${C_N} ${C_B}zyvo install${C_N}\n"
 fi
 printf "\n  ${C_D}open a new shell, then run:${C_N} ${C_B}zyvo${C_N}\n\n"
