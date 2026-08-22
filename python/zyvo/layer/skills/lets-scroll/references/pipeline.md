@@ -222,7 +222,7 @@ dive / $1.87 connector; 720p ≈ $1.21 / $0.76; 480p previz ≈ $0.28 / $0.35.
 monid_frame_url() { # localPng remoteName  (JPEG-compresses on the way up)
   jpg="$WORK/sfs_$2.jpg"
   ffmpeg -v error -y -i "$1" -vf "scale='min(1536,iw)':-2" -q:v 2 "$jpg"
-  size=$(wc -c < "$jpg" | tr -d '[:space:]')
+  size=$(stat -f%z "$jpg")
   up=$(NO_COLOR=1 monid run -p sfs -e /put \
     -i "{\"path\":\"chain/$2.jpg\",\"sizeBytes\":$size,\"ttl\":\"1h\"}" -w 60 -j \
     | jq -r '.output.uploadUrl')
@@ -232,16 +232,12 @@ monid_frame_url() { # localPng remoteName  (JPEG-compresses on the way up)
 }
 
 # fire-and-poll (the CLI's -w caps at 120s and seedance can exceed it)
-monid_wait() { # runId outJson   (gives up after ~20 min of no terminal state)
-  n=0
+monid_wait() { # runId outJson
   while :; do
     NO_COLOR=1 monid runs get -r "$1" -j > "$2" 2>/dev/null
-    st=$(jq -r '.status // empty' "$2")
-    case "$st" in
+    case "$(jq -r '.status // empty' "$2")" in
       COMPLETED|FAILED|BLOCKED|STOPPED|TIME_OUT) break ;;
     esac
-    n=$((n+1))
-    [ "$n" -ge 150 ] && { echo "monid_wait: giving up on $1 (last status: ${st:-none})"; break; }
     sleep 8
   done
 }

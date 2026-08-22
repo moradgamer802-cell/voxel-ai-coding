@@ -19,108 +19,30 @@ allowed-tools: Bash, Read, Write, Edit, AskUserQuestion, Skill
 
 # lets-scroll
 
-Produces an Apple-style **3D scroll-driven landing page**: as the visitor scrolls, a pre-rendered camera dives smoothly through 3D dioramas or cinematic scenes with zero cuts — one continuous connected flight.
+Produces a landing page where **scroll drives a camera**: it dives from outside a scene
+into its interior, then flies out and into the next scene, continuously, with no visible
+cuts. The visuals are AI-generated — stills via Higgsfield (or Codex), the video chain
+via **Monid by default** (pay-per-clip Seedance 2.0; Higgsfield credits as fallback) —
+and the page just scrubs pre-rendered video by scroll position. A **manual asset path**
+(Step 1.7) swaps the render calls for a prompt + file handoff: the user generates every
+still and clip in tools of their choice and drops the files into the work folder;
+everything downstream (frame extraction, encode, engine, QA) is identical. This is the same technique behind Apple's scroll-through product
+pages — the camera genuinely moves, scroll only drives time.
 
-The scrub engine (`references/scrub-engine.js`) is lightweight vanilla JS with zero dependencies, featuring smooth rAF scrub smoothing, seek coalescing, and mobile optimizations.
+**What you generate:** N scene stills → N "dive-in" camera clips → N-1 "connector" clips
+that join consecutive scenes seamlessly → a portable scrub engine that plays the whole
+chain as one flight.
 
----
+**The one rule that makes or breaks it:** seams must be *frame-identical*. Read
+[The seamless chain](#step-5--the-seamless-chain-the-critical-part) before generating any
+connector. Getting this wrong is the single most common failure and produces a visible
+"pop" between scenes.
 
-## 🎯 Primary Workflow: Prompt Handover & Video Drop (Default — Zero-Config)
-
-This is the default, 100% mobile-friendly workflow.
-
-> 🗣️ **Beginner voice — mandatory on this whole workflow.** The user may never have
-> used an AI video tool before, so at every step:
-> - Explain in **the user's own language, plain words** — no jargon without a one-line
->   translation ("prompt = AI-কে দেওয়া লিখিত নির্দেশনা / the written instruction you
->   paste into the video tool").
-> - **One action per message** — say exactly what to do NOW, where the file is, and
->   what "done" looks like. Never dump five steps and leave.
-> - Every prompt ships as a **text file sitting exactly where its result belongs**:
->   `assets/image1.txt` next to where `scene1.png` goes, `videos/video1.txt` next to
->   where `video1.mp4` goes, `videos/connector1.txt` next to `conn1.mp4`. One folder
->   opened = instruction + result side by side; nothing to memorise.
-> - ALSO show the prompt text itself in chat (copyable) — never make the user hunt
->   through files to see what they're pasting.
-> - Tell them WHERE things go: images + their `.txt` prompts → `assets/`,
->   videos/connectors + their `.txt` prompts + upload frames → `videos/`.
-
-### Step 1: Concept & Website Base Setup
-1. Ask the user for the **Topic / Business**, **Brand Name**, and **Number of Scenes** (2, 3, 4, or 6 scenes).
-2. The moment they pick a count `N`, **state the complete build plan** so nothing is a surprise later:
-   > *"<N>টা scene = <N>টা ছবি + <N>টা ভিডিও + <N−1>টা connector (ছোট যুক্ত করার ক্লিপ)। সব prompt এখনই দিয়ে দিচ্ছি — connector গুলোও, ওগুলো ছাড়া scroll-এ লাফিয়ে লাফিয়ে যাবে, দেখতে খারাপ লাগবে।"*
-   *(Adapt to the user's language; same content: images + videos + connectors, ALL prompts come now.)*
-3. Immediately generate the complete frontend website:
-   - `index.html` + `style.css` + copy `references/scrub-engine.js`.
-   - Setup the section titles, subtitles, tags, accent colors, and CTA buttons.
-   - Create `assets/` and `videos/` folders in the project.
-
-### Step 2: Phase A — Dive Videos (each seeded with its OWN scene still)
-Generate **one image prompt per scene** and **one dive video prompt per scene**, formatted for web AI video tools (**Kling AI, Luma Dream Machine, Runway Gen-3, Minimax Hailuo, Pika**). Write every prompt as a file NEXT TO where its result goes — image prompts to `assets/image1.txt`, `image2.txt`, … ; video prompts to `videos/video1.txt`, `video2.txt`, … ; connector prompts to `videos/connector1.txt`, … (with their FIRST/LAST FRAME lines marked `(AI fills this after your videos arrive)`) — then show the short spec table in chat. The seeding rule is what keeps every clip on-topic and the world cohesive:
-
-> 🚫 **Deliver EVERYTHING in this ONE message.** All N image prompts + all N dive
-> prompts + all N−1 connector prompts (files written, connectors with placeholders).
-> **There is NO unlock system on this path** — never hold back video prompts, never
-> say "video-02 will unlock after video-01", never make the user come back between
-> scenes just to receive the next prompt. Every dive is independent because each
-> starts from its own still; only the connector FRAME SLOTS wait for the rendered
-> videos.
-
-> ⚠️ **Two hard rules — state them to the user every time, in their words:**
-> - ❌ **Never generate a section video text-only.** Each video MUST start from its own scene image (uploaded as the start / first frame). Text-only clips are unrelated worlds and the seams can never match.
-> - ❌ **Never chain a main video from the previous main video's last frame.** That is how the camera drifts off-topic by scene 2–3. Chaining belongs ONLY to the short connectors in Phase B.
-> - ✅ Every dive starts from ITS OWN still → on-topic, and all scenes share one world.
-
-Present as a table (never prose) — each row's Prompt column IS its `.txt` file:
-
-| What you make | Upload with it | Prompt file | Save result as |
-|---|---|---|---|
-| Scene images | — | `assets/image1.txt` … | `assets/scene1.png` … |
-| Dive videos | that scene's image | `videos/video1.txt` … | `videos/video1.mp4` … |
-| Connectors (later, after videos) | 2 frames AI fills in | `videos/connector1.txt` … (ready now, frames pending) | `videos/conn1.mp4` … |
-
-Add one line of tool-specific how-to: **Kling → Image-to-Video (first frame)**, **Luma → keyframe start**, **Runway → first/last frame input**, Hailuo/Pika → image-to-video if available.
-
-Tell the user (plain words):
-> *"প্রথমে <N>টা ছবি বানান — `assets/image1.txt` ফাইল খুলে টেক্সটটা কপি করে আপনার image tool-এ পেস্ট করুন। ছবিটা সেই ফোল্ডারেই রাখুন (`assets/scene1.png`)। তারপর প্রতিটা ভিডিওর জন্য `videos/video1.txt`-এর টেক্সট + ওই scene-এর ছবিটা একসাথে আপনার video tool-এ দিন (ছবিটা 'start frame' হিসেবে)। ভিডিওও ওই `videos/` ফোল্ডারেই রাখুন। ভিডিওগুলো হলে 'done' লিখুন — তখন আমি frame জুড়ে connector prompt গুলো (`videos/connector1.txt` …) ready করে দেব, ওগুলো দিয়েই শেষ ধাপ।"*
-> *(Translate/adapt to whatever language the user speaks — same structure: open the txt next to where the result goes → copy text → paste in tool → add the image → save result in the same folder → reply done; connectors finalize after videos.)*
-
-### Step 3: Phase B — Connectors (MANDATORY — never skip)
-The connector prompt files already exist from Phase A (`videos/connector1.txt`, …) with
-their FIRST/LAST FRAME slots marked `(AI fills this after your videos arrive)`. When the
-dives land, finalize them. **A build without connectors is a broken build** — without
-them the scroll jumps between scenes and looks cheap. Never ship `null` connectors just
-to save effort; the only sanctioned fallback is a tool that literally has no end-frame
-slot (say so explicitly, wire those as `null`, engine crossfades).
-
-1. Extract boundary frames from the RENDERED dives (not the stills), saved INTO `videos/`. If `ffmpeg` exists run it yourself:
-   ```bash
-   ffmpeg -sseof -0.15 -i videos/video1.mp4 -frames:v 1 -q:v 2 videos/last1.png    # dive 1 interior
-   ffmpeg -ss 0      -i videos/video2.mp4 -frames:v 1 -q:v 2 videos/first2.png     # dive 2 establishing
-   ```
-   No ffmpeg on device? Tell the user to grab the last frame of `video_i` and the first frame of `video_{i+1}` from their video player/tool and drop them into `videos/`.
-2. **Fill the placeholders**: replace each connector file's `(AI fills this…)` lines with the real frame paths, and present the spec table:
-
-   | Connector | Start frame (upload) | End frame (upload) | Prompt file | Save result as |
-   |---|---|---|---|---|
-   | conn1 | `videos/last1.png` | `videos/first2.png` | `videos/connector1.txt` (5 s) | `videos/conn1.mp4` |
-   | conn2 | `videos/last2.png` | `videos/first3.png` | `videos/connector2.txt` | `videos/conn2.mp4` |
-
-   Explain WHY in one beginner line: *"এই ছোট ক্লিপগুলোর শুরু আর শেষ দুই মাথাই আসল ছবি দিয়ে আটকানো — তাই এগুলো কখনো গল্প থেকে সরে যাবে না; এগুলোই আলাদা ভিডিওগুলোকে এক টানা যাত্রা বানায়।"*
-
-3. State the fallback up front: **if the user's tool has no end-frame slot, don't force it** — say you'll wire those connectors as `null` and the engine crossfades those seams directly. The page still completes — but this is the LAST resort, never the plan.
-
-### Step 4: Video Assembly & Live Preview
-When the clips are in `videos/` (or the user already had videos):
-1. Scan `videos/` for the dive clips in sequence; connectors map gap-by-gap (`conn_i` between `video_i` and `video_{i+1}`).
-2. Auto-extract poster frames (`ffmpeg -ss 0 -i video1.mp4 -frames:v 1 -q:v 2 video1_poster.webp` if ffmpeg exists).
-3. Wire `mountLetsScroll()` in `index.html` — `sections[k].clip = videos/videoK.mp4`, `connectors = ['videos/conn1.mp4', …]` (length = sections − 1; missing connectors → `null` entries, engine crossfades).
-4. Run `zyvo preview .` to start the background server, auto-open the device browser, and deliver the Local + Temporary Public Live Link!
-
----
-
-## ⚙️ Alternate Workflow: Direct Cloud CLI Render (Monid / Higgsfield)
-*(For desktop environments with configured CLI API keys)*
+Do not assume a frontend framework. The scrub engine in `references/scrub-engine.js` is
+self-contained vanilla JS (it builds its own DOM + injects its own CSS into a container
+you give it), so it drops into plain HTML, Next.js, Vue, a Python-served page, anything.
+The value of this skill is the Higgsfield pipeline, the prompts, and the seam method —
+not the framework.
 
 ---
 
@@ -241,10 +163,26 @@ default. Cover:
      a "mobile version," it's just the page not breaking when a phone visits — so a
      desktop-only build still degrades gracefully.
 
-7. **Asset source — local folder, automatic, or manual.**
-   - **Local folder drop (Fastest / Recommended on mobile/Termux)** — the user already has videos in a directory (`videos/`, `assets/`, or `Download/`). The skill auto-scans them, generates posters, sets up `scrub-engine.js`, and launches preview immediately. Zero API keys or cloud CLI needed.
-   - **Automatic** — the skill renders everything via CLI: stills via Higgsfield `gpt_image_2` (or Codex), video chain via Monid (Seedance 2.0).
-   - **Manual prompts** — the skill writes prompt files + conditioning frames for the user to render externally.
+7. **Asset source — automatic or manual. ALWAYS ask; it decides who renders.**
+   Two options (`AskUserQuestion` in Claude Code; a plain either/or elsewhere):
+   *"How do you want to produce the stills and clips — should I generate them, or
+   do you want the prompts to render in tools of your choice?"* Record as
+   `ASSET_SOURCE`.
+   - **Automatic (default)** — the skill renders everything itself: stills via
+     Higgsfield `gpt_image_2` (or Codex `image_gen`), the video chain via Monid
+     with Higgsfield as fallback biller. Item 8 prices this path.
+   - **Manual** — the skill writes every prompt to a file (`still_<name>.txt` at
+     Step 2, `dive_<name>.txt` at Step 4, `conn_<i>.txt` at Step 5) plus the exact
+     conditioning frames each clip must start/end on; the user copy-pastes the
+     prompts into tools of their choice (any image tool for the stills; a
+     start/end-frame-capable video tool for the clips) and drops the finished
+     files into `$WORK`. The skill validates what comes back (count, dimensions,
+     aspect, duration, seam frames) and continues the same downstream pipeline —
+     only the render calls change. State the one hard requirement up front: the
+     seamless rule still applies, so their **video** tool must accept a
+     first/start frame (both architectures) and, for architecture B connectors, a
+     last/end frame — if it can't, steer `CAMERA` to architecture A or have them
+     pick a tool that can (Steps 4–5).
 
 8. **Budget — engines shown by cost, decided before anything renders.** On the
    **manual** path (item 7) there is nothing to bill here — the spend happens in
